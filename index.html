@@ -1321,45 +1321,407 @@
     
     // File System Access API Functions
     async function openFile() {
-    const fileInput = document.createElement('input');
-    fileInput.type = 'file';
-    fileInput.accept = 'application/json';
-
-    fileInput.addEventListener('change', (event) => {
-        const file = event.target.files[0];
-        if (!file) return;
-
-        const reader = new FileReader();
-        reader.onload = (e) => {
-            try {
-                const data = JSON.parse(e.target.result);
-                appState.accounts = data.accounts || [];
-                appState.categories = data.categories || [];
-                appState.envelopes = data.envelopes || [];
-                appState.transactions = data.transactions || [];
-                appState.payees = data.payees || [];
-                appState.nextIds = data.nextIds || {
-                    account: 1,
-                    category: 1,
-                    envelope: 1,
-                    transaction: 1,
-                    payee: 1
-                };
-
-                renderAccounts();
-                renderCategories();
-                renderTransactions();
-                renderPayees();
-                updateBalances();
-                showNotification("Budget file loaded successfully.");
-            } catch (error) {
-                alert("Failed to parse the file.");
+        try {
+            // Check if the File System Access API is supported
+            if (!window.showOpenFilePicker) {
+                alert('File System Access API is not supported in your browser. Try using Chrome or Edge.');
+                return;
             }
-        };
-        reader.readAsText(file);
-    });
+            
+            // Open file picker
+            const [fileHandle] = await window.showOpenFilePicker({
+                types: [{
+                    description: 'Budget Files',
+                    accept: {
+                        'application/json': ['.json']
+                    }
+                }],
+                multiple: false
+            });
+            
+            // Get the file
+            const file = await fileHandle.getFile();
+            const contents = await file.text();
+            
+            // Parse the file contents
+            const data = JSON.parse(contents);
+            
+            // Update app state with the loaded data
+            appState.accounts = data.accounts || [];
+            appState.categories = data.categories || [];
+            appState.envelopes = data.envelopes || [];
+            appState.transactions = data.transactions || [];
+            appState.payees = data.payees || [];
+            appState.nextIds = data.nextIds || {
+                account: 1,
+                category: 1,
+                envelope: 1,
+                transaction: 1,
+                payee: 1
+            };
+            
+            // Store the file handle for future saves
+            appState.fileSettings.fileHandle = fileHandle;
+            appState.fileSettings.lastSync = new Date();
+            
+            // Update UI
+            renderAccounts();
+            renderCategories();
+            renderTransactions();
+            renderPayees();
+            updateBalances();
+            
+            updateSyncStatus('connected', 'File loaded successfully');
+            
+            // Start auto-save if enabled
+            if (appState.fileSettings.autoSave) {
+                startAutoSave();
+            }
+            
+        } catch (error) {
+            if (error.name !== 'AbortError') {
+                updateSyncStatus('error', `Error loading file: ${error.message}`);
+            }
+        }
+    }
+    
+    async function saveData() {
+        try {
+            updateSyncStatus('syncing');
+            
+            // Prepare data to save
+            const dataToSave = {
+                accounts: appState.accounts,
+                categories: appState.categories,
+                envelopes: appState.envelopes,
+                transactions: appState.transactions,
+                payees: appState.payees,
+                nextIds: appState.nextIds
+            };
+            
+            let fileHandle = appState.fileSettings.fileHandle;
+            
+            // If we don't have a file handle, show save dialog
+            if (!fileHandle) {
+                fileHandle = await window.showSaveFilePicker({
+                    types: [{
+                        description: 'Budget Files',
+                        accept: {
+                            'application/json': ['.json']
+                        }
+                    }],
+                    suggestedName: 'envelope-budget.json'
+                });
+                
+                appState.fileSettings.fileHandle = fileHandle;
+            }
+            
+            // Create a writable stream
+            const writable = await fileHandle.createWritable();
+            
+            // Write the contents
+            await writable.write(JSON.stringify(dataToSave, null, 2));
+            
+            // Close the file
+            await writable.close();
+            
+            appState.fileSettings.lastSync = new Date();
+            updateSyncStatus('connected', 'Data saved successfully');
+            
+        } catch (error) {
+            if (error.name !== 'AbortError') {
+                updateSyncStatus('error', `Error saving file: ${error.message}`);
+            }
+        }
+    }
+    
+    async function saveAsNewFile() {
+        try {
+            updateSyncStatus('syncing');
+            
+            // Prepare data to save
+            const dataToSave = {
+                accounts: appState.accounts,
+                categories: appState.categories,
+                envelopes: appState.envelopes,
+                transactions: appState.transactions,
+                payees: appState.payees,
+                nextIds: appState.nextIds
+            };
+            
+            // Show save dialog
+            const fileHandle = await window.showSaveFilePicker({
+                types: [{
+                    description: 'Budget Files',
+                    accept: {
+                        'application/json': ['.json']
+                    }
+                }],
+                suggestedName: 'envelope-budget.json'
+            });
+            
+            // Create a writable stream
+            const writable = await fileHandle.createWritable();
+            
+            // Write the contents
+            await writable.write(JSON.stringify(dataToSave, null, 2));
+            
+            // Close the file
+            await writable.close();
+            
+            // Update file handle
+            appState.fileSettings.fileHandle = fileHandle;
+            appState.fileSettings.lastSync = new Date();
+            
+            updateSyncStatus('connected', 'Data saved successfully');
+            
+        } catch (error) {
+            if (error.name !== 'AbortError') {
+                updateSyncStatus('error', `Error saving file: ${error.message}`);
+            }
+        }
+    }
+    
+    function startAutoSave() {
+        // Clear any existing interval
+        if (window.autoSaveInterval) {
+            clearInterval(window.autoSaveInterval);
+        }
+        
+        // Set up new interval
+        window.autoSaveInterval = setInterval(() => {
+            if (appState.fileSettings.fileHandle) {
+                saveData();
+            }
+        }, appState.fileSettings.saveInterval);
+    }
+    
+    function stopAutoSave() {
+        if (window.autoSaveInterval) {
+            clearInterval(window.autoSaveInterval);
+            window.autoSaveInterval = null;
+        }
+    }
+    
+    // Update sync status indicator
+    function updateSyncStatus(status, message = '') {
+        appState.fileSettings.status = status;
+        
+        // Update the sync button icon
+        if (status === 'syncing') {
+            elements.syncBtn.innerHTML = '<i class="fas fa-save fa-spin"></i>';
+            elements.syncStatus.classList.add('hidden');
+        } else if (status === 'connected') {
+            elements.syncBtn.innerHTML = '<i class="fas fa-save"></i>';
+            elements.syncStatus.classList.remove('hidden');
+            elements.syncStatus.classList.remove('bg-red-500');
+            elements.syncStatus.classList.add('bg-green-500');
+        } else if (status === 'error') {
+            elements.syncBtn.innerHTML = '<i class="fas fa-save"></i>';
+            elements.syncStatus.classList.remove('hidden');
+            elements.syncStatus.classList.remove('bg-green-500');
+            elements.syncStatus.classList.add('bg-red-500');
+        } else {
+            elements.syncBtn.innerHTML = '<i class="fas fa-save"></i>';
+            elements.syncStatus.classList.add('hidden');
+        }
+        
+        // Show a notification if needed
+        if (message) {
+            showNotification(message, status === 'error' ? 'error' : 'success');
+        }
+    }
+    
+    // Show a temporary notification
+    function showNotification(message, type = 'success') {
+        // Remove any existing notifications
+        const existingNotification = document.getElementById('notification');
+        if (existingNotification) {
+            existingNotification.remove();
+        }
+        
+        // Create a new notification
+        const notification = document.createElement('div');
+        notification.id = 'notification';
+        notification.className = `fixed bottom-4 left-0 right-0 mx-auto w-5/6 max-w-sm p-3 rounded-md shadow-lg ${
+            type === 'error' ? 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-100' : 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-100'
+        } slide-in`;
+        
+        notification.innerHTML = `
+            <div class="flex items-center justify-between">
+                <div class="flex items-center">
+                    <i class="fas ${type === 'error' ? 'fa-exclamation-circle' : 'fa-check-circle'} mr-2"></i>
+                    <span>${message}</span>
+                </div>
+                <button class="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+        `;
+        
+        document.body.appendChild(notification);
+        
+        // Add event listener to close button
+        notification.querySelector('button').addEventListener('click', () => {
+            notification.remove();
+        });
+        
+        // Auto-remove after 5 seconds
+        setTimeout(() => {
+            if (document.getElementById('notification')) {
+                notification.style.opacity = '0';
+                notification.style.transform = 'translateY(20px)';
+                notification.style.transition = 'opacity 0.5s, transform 0.5s';
+                
+                // Remove from DOM after transition
+                setTimeout(() => {
+                    if (document.getElementById('notification')) {
+                        notification.remove();
+                    }
+                }, 500);
+            }
+        }, 5000);
+    }
+    
+    // Settings Modal
+    function showSettingsModal() {
+        const content = `
+            <div class="space-y-4">
+                <div class="flex items-center justify-between">
+                    <span class="text-sm font-medium">Auto Save</span>
+                    <label class="relative inline-flex items-center cursor-pointer">
+                        <input type="checkbox" id="auto-save" class="sr-only peer" ${appState.fileSettings.autoSave ? 'checked' : ''}>
+                        <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-primary/20 dark:peer-focus:ring-primary/30 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-primary"></div>
+                    </label>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium mb-1" for="save-interval">Save Interval (minutes)</label>
+                    <input type="number" id="save-interval" class="w-full p-2 rounded-md border border-gray-300 dark:border-gray-600 bg-light-input dark:bg-dark-input text-base" min="1" value="${appState.fileSettings.saveInterval / 60000}" ${!appState.fileSettings.autoSave ? 'disabled' : ''}>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium mb-1" for="encryption-key">Encryption Key (Optional)</label>
+                    <input type="password" id="encryption-key" class="w-full p-2 rounded-md border border-gray-300 dark:border-gray-600 bg-light-input dark:bg-dark-input text-base" value="${appState.fileSettings.encryptionKey}" placeholder="Leave blank for no encryption">
+                    <p class="text-xs text-gray-500 mt-1">Enter a secure passphrase to encrypt your data</p>
+                </div>
+                <div class="border-t border-gray-200 dark:border-gray-700 pt-4 mt-4">
+                    <div class="space-y-2">
+                        <button id="open-file-btn" class="w-full py-2 bg-primary text-white rounded-md hover:bg-secondary transition-colors">
+                            Open Budget File
+                        </button>
+                        <button id="save-as-btn" class="w-full py-2 bg-gray-200 text-gray-800 dark:bg-gray-700 dark:text-gray-200 rounded-md hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors">
+                            Save As New File
+                        </button>
+                    </div>
+                </div>
+                <div class="pt-2">
+                    <button id="save-settings" class="w-full py-2 bg-primary text-white rounded-md hover:bg-secondary transition-colors">Save Settings</button>
+                </div>
+            </div>
+        `;
+        
+        showModal('Settings', content);
+        
+        // Event listeners for the settings modal
+        const autoSaveToggle = document.getElementById('auto-save');
+        const saveIntervalInput = document.getElementById('save-interval');
+        const openFileBtn = document.getElementById('open-file-btn');
+        const saveAsBtn = document.getElementById('save-as-btn');
+        const saveSettingsBtn = document.getElementById('save-settings');
+        
+        autoSaveToggle.addEventListener('change', () => {
+            saveIntervalInput.disabled = !autoSaveToggle.checked;
+        });
+        
+        openFileBtn.addEventListener('click', async () => {
+            hideModal();
+            await openFile();
+        });
+        
+        saveAsBtn.addEventListener('click', async () => {
+            hideModal();
+            await saveAsNewFile();
+        });
+        
+        saveSettingsBtn.addEventListener('click', () => {
+            const autoSave = autoSaveToggle.checked;
+            const saveInterval = parseInt(saveIntervalInput.value) * 60000; // Convert minutes to milliseconds
+            const encryptionKey = document.getElementById('encryption-key').value;
+            
+            // Update settings
+            appState.fileSettings.autoSave = autoSave;
+            appState.fileSettings.saveInterval = saveInterval;
+            appState.fileSettings.encryptionKey = encryptionKey;
+            
+            // Clear any existing auto-save interval
+            stopAutoSave();
+            
+            // Set up auto-save if enabled
+            if (autoSave && appState.fileSettings.fileHandle) {
+                startAutoSave();
+            }
+            
+            hideModal();
+        });
+    }
+    
+    // Initialize the app
+    function initApp() {
+        // Load sample data if no file is loaded
+        if (appState.accounts.length === 0 && 
+            appState.categories.length === 0 && 
+            appState.envelopes.length === 0) {
+            initSampleData();
+        }
+        
+        // Render UI
+        renderAccounts();
+        renderCategories();
+        renderTransactions();
+        renderPayees();
+        updateBalances();
+        
+        // Set up auto-save if enabled
+        if (appState.fileSettings.autoSave && appState.fileSettings.fileHandle) {
+            startAutoSave();
+        }
+    }
+    
+    // Start the app
+    initApp();
 
-    fileInput.click();
+document.getElementById('file-input').addEventListener('change', (event) => {
+    const file = event.target.files[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+        try {
+            const data = JSON.parse(e.target.result);
+            appState.accounts = data.accounts || [];
+            appState.categories = data.categories || [];
+            appState.envelopes = data.envelopes || [];
+            appState.transactions = data.transactions || [];
+            appState.payees = data.payees || [];
+            appState.nextIds = data.nextIds || {
+                account: 1,
+                category: 1,
+                envelope: 1,
+                transaction: 1,
+                payee: 1
+            };
+
+            renderAccounts();
+            renderCategories();
+            renderTransactions();
+            renderPayees();
+            updateBalances();
+
+            showNotification("Budget file loaded successfully.");
+        } catch (error) {
+            alert("Failed to parse the file.");
+        }
+    };
+    reader.readAsText(file);
 });
 
 </script>
