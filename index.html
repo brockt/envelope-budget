@@ -75,7 +75,7 @@
             <h1 class="text-xl font-bold text-primary">Envelope Budget</h1>
             <div class="flex space-x-3 items-center">
                 <button id="sync-btn" class="text-primary text-xl relative">
-                    <i class="fas fa-save"></i>
+                    <i class="fas fa-sync-alt"></i>
                     <span id="sync-status" class="hidden absolute -top-1 -right-1 w-3 h-3 bg-green-500 rounded-full"></span>
                 </button>
                 <button id="settings-btn" class="text-primary text-xl">
@@ -211,13 +211,19 @@
                 transaction: 1,
                 payee: 1
             },
-            fileSettings: {
-                fileHandle: null,
+            webdav: {
+                enabled: false,
+                url: '',
+                username: '',
+                password: '',
                 lastSync: null,
-                autoSave: true,
-                saveInterval: 5 * 60 * 1000, // 5 minutes in milliseconds
+                syncInterval: 5 * 60 * 1000, // 5 minutes in milliseconds
                 encryptionKey: '',
                 status: 'disconnected' // disconnected, connected, syncing, error
+            },
+            syncSettings: {
+                autoSync: true,
+                notifyOnSync: true
             }
         };
         
@@ -905,824 +911,925 @@
                     </div>
                     <div>
                         <label class="block text-sm font-medium mb-1" for="envelope-amount">Budget Amount</label>
-                        <input type="number" id="envelope amount" class="w-full p-2 rounded-md border border-gray-300 dark:border-gray-600 bg-light-input dark:bg-dark-input text-base" step="0.01" min="0" value="envelope.budgetAmount"required></div><div><labelclass="blocktext−smfont−mediummb−1"for="envelope−spent">SpentAmount</label><inputtype="number"id="envelope−spent"class="w−fullp−2rounded−mdborderborder−gray−300dark:border−gray−600bg−light−inputdark:bg−dark−inputtext−base"step="0.01"min="0"value="{envelope.spent}" required>
-</div>
-<div>
-<label class="block text-sm font-medium mb-1" for="envelope-due-date">Due Date</label>
-<input type="date" id="envelope-due-date" class="w-full p-2 rounded-md border border-gray-300 dark:border-gray-600 bg-light-input dark:bg-dark-input text-base" value="${envelope.dueDate}" required>
-</div>
-<div class="pt-2 flex space-x-2">
-<button type="submit" class="flex-1 py-2 bg-primary text-white rounded-md hover:bg-secondary transition-colors">Update</button>
-<button type="button" id="delete-envelope" class="py-2 px-4 bg-red-500 text-white rounded-md hover:bg-red-600 transition-colors">
-<i class="fas fa-trash"></i>
-</button>
-</div>
-</form>
-`;
-
-        showModal('Edit Envelope', content);
-        
-        const form = document.getElementById('edit-envelope-form');
-        form.addEventListener('submit', (e) => {
-            e.preventDefault();
-            const name = document.getElementById('envelope-name').value;
-            const categoryId = parseInt(document.getElementById('envelope-category').value);
-            const budgetAmount = parseFloat(document.getElementById('envelope-amount').value);
-            const spent = parseFloat(document.getElementById('envelope-spent').value);
-            const dueDate = document.getElementById('envelope-due-date').value;
+                        <input type="number" id="envelope-amount" class="w-full p-2 rounded-md border border-gray-300 dark:border-gray-600 bg-light-input dark:bg-dark-input text-base" step="0.01" min="0" value="${envelope.budgetAmount}" required>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium mb-1" for="envelope-spent">Spent Amount</label>
+                        <input type="number" id="envelope-spent" class="w-full p-2 rounded-md border border-gray-300 dark:border-gray-600 bg-light-input dark:bg-dark-input text-base" step="0.01" min="0" value="${envelope.spent}" required>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium mb-1" for="envelope-due-date">Due Date</label>
+                        <input type="date" id="envelope-due-date" class="w-full p-2 rounded-md border border-gray-300 dark:border-gray-600 bg-light-input dark:bg-dark-input text-base" value="${envelope.dueDate}" required>
+                    </div>
+                    <div class="pt-2 flex space-x-2">
+                        <button type="submit" class="flex-1 py-2 bg-primary text-white rounded-md hover:bg-secondary transition-colors">Update</button>
+                        <button type="button" id="delete-envelope" class="py-2 px-4 bg-red-500 text-white rounded-md hover:bg-red-600 transition-colors">
+                            <i class="fas fa-trash"></i>
+                        </button>
+                    </div>
+                </form>
+            `;
             
-            // Update envelope
-            envelope.name = name;
-            envelope.categoryId = categoryId;
-            envelope.budgetAmount = budgetAmount;
-            envelope.spent = spent;
-            envelope.dueDate = dueDate;
+            showModal('Edit Envelope', content);
             
-            renderCategories();
-            updateBalances();
-            hideModal();
-        });
-        
-        const deleteBtn = document.getElementById('delete-envelope');
-        deleteBtn.addEventListener('click', () => {
-            // Check if envelope has transactions
-            const hasTransactions = appState.transactions.some(t => t.envelopeId === envelope.id);
-            
-            if (hasTransactions) {
-                alert('Cannot delete envelope with transactions. Remove transactions first.');
-                return;
-            }
-            
-            // Remove envelope
-            const index = appState.envelopes.findIndex(e => e.id === envelope.id);
-            if (index !== -1) {
-                appState.envelopes.splice(index, 1);
+            const form = document.getElementById('edit-envelope-form');
+            form.addEventListener('submit', (e) => {
+                e.preventDefault();
+                const name = document.getElementById('envelope-name').value;
+                const categoryId = parseInt(document.getElementById('envelope-category').value);
+                const budgetAmount = parseFloat(document.getElementById('envelope-amount').value);
+                const spent = parseFloat(document.getElementById('envelope-spent').value);
+                const dueDate = document.getElementById('envelope-due-date').value;
+                
+                // Update envelope
+                envelope.name = name;
+                envelope.categoryId = categoryId;
+                envelope.budgetAmount = budgetAmount;
+                envelope.spent = spent;
+                envelope.dueDate = dueDate;
+                
                 renderCategories();
                 updateBalances();
                 hideModal();
-            }
-        });
-    }
-    
-    function showAddPayeeModal() {
-        const content = `
-            <form id="add-payee-form" class="space-y-4">
-                <div>
-                    <label class="block text-sm font-medium mb-1" for="payee-name">Payee Name</label>
-                    <input type="text" id="payee-name" class="w-full p-2 rounded-md border border-gray-300 dark:border-gray-600 bg-light-input dark:bg-dark-input text-base" required>
-                </div>
-                <div class="pt-2">
-                    <button type="submit" class="w-full py-2 bg-primary text-white rounded-md hover:bg-secondary transition-colors">Add Payee</button>
-                </div>
-            </form>
-        `;
-        
-        showModal('Add Payee', content);
-        
-        const form = document.getElementById('add-payee-form');
-        form.addEventListener('submit', (e) => {
-            e.preventDefault();
-            const name = document.getElementById('payee-name').value;
+            });
             
-            addPayee({ name });
-            hideModal();
-        });
-    }
-    
-    function showEditPayeeModal(payee) {
-        const content = `
-            <form id="edit-payee-form" class="space-y-4">
-                <div>
-                    <label class="block text-sm font-medium mb-1" for="payee-name">Payee Name</label>
-                    <input type="text" id="payee-name" class="w-full p-2 rounded-md border border-gray-300 dark:border-gray-600 bg-light-input dark:bg-dark-input text-base" value="${payee.name}" required>
-                </div>
-                <div class="pt-2 flex space-x-2">
-                    <button type="submit" class="flex-1 py-2 bg-primary text-white rounded-md hover:bg-secondary transition-colors">Update</button>
-                    <button type="button" id="delete-payee" class="py-2 px-4 bg-red-500 text-white rounded-md hover:bg-red-600 transition-colors">
-                        <i class="fas fa-trash"></i>
-                    </button>
-                </div>
-            </form>
-        `;
+            const deleteBtn = document.getElementById('delete-envelope');
+            deleteBtn.addEventListener('click', () => {
+                // Check if envelope has transactions
+                const hasTransactions = appState.transactions.some(t => t.envelopeId === envelope.id);
+                
+                if (hasTransactions) {
+                    alert('Cannot delete envelope with transactions. Remove transactions first.');
+                    return;
+                }
+                
+                // Remove envelope
+                const index = appState.envelopes.findIndex(e => e.id === envelope.id);
+                if (index !== -1) {
+                    appState.envelopes.splice(index, 1);
+                    renderCategories();
+                    updateBalances();
+                    hideModal();
+                }
+            });
+        }
         
-        showModal('Edit Payee', content);
+        function showAddPayeeModal() {
+            const content = `
+                <form id="add-payee-form" class="space-y-4">
+                    <div>
+                        <label class="block text-sm font-medium mb-1" for="payee-name">Payee Name</label>
+                        <input type="text" id="payee-name" class="w-full p-2 rounded-md border border-gray-300 dark:border-gray-600 bg-light-input dark:bg-dark-input text-base" required>
+                    </div>
+                    <div class="pt-2">
+                        <button type="submit" class="w-full py-2 bg-primary text-white rounded-md hover:bg-secondary transition-colors">Add Payee</button>
+                    </div>
+                </form>
+            `;
+            
+            showModal('Add Payee', content);
+            
+            const form = document.getElementById('add-payee-form');
+            form.addEventListener('submit', (e) => {
+                e.preventDefault();
+                const name = document.getElementById('payee-name').value;
+                
+                addPayee({ name });
+                hideModal();
+            });
+        }
         
-        const form = document.getElementById('edit-payee-form');
-        form.addEventListener('submit', (e) => {
-            e.preventDefault();
-            const name = document.getElementById('payee-name').value;
+        function showEditPayeeModal(payee) {
+            const content = `
+                <form id="edit-payee-form" class="space-y-4">
+                    <div>
+                        <label class="block text-sm font-medium mb-1" for="payee-name">Payee Name</label>
+                        <input type="text" id="payee-name" class="w-full p-2 rounded-md border border-gray-300 dark:border-gray-600 bg-light-input dark:bg-dark-input text-base" value="${payee.name}" required>
+                    </div>
+                    <div class="pt-2 flex space-x-2">
+                        <button type="submit" class="flex-1 py-2 bg-primary text-white rounded-md hover:bg-secondary transition-colors">Update</button>
+                        <button type="button" id="delete-payee" class="py-2 px-4 bg-red-500 text-white rounded-md hover:bg-red-600 transition-colors">
+                            <i class="fas fa-trash"></i>
+                        </button>
+                    </div>
+                </form>
+            `;
             
-            // Update payee
-            payee.name = name;
+            showModal('Edit Payee', content);
             
-            renderPayees();
-            renderTransactions(); // Update transaction display with new payee name
-            hideModal();
-        });
+            const form = document.getElementById('edit-payee-form');
+            form.addEventListener('submit', (e) => {
+                e.preventDefault();
+                const name = document.getElementById('payee-name').value;
+                
+                // Update payee
+                payee.name = name;
+                
+                renderPayees();
+                renderTransactions(); // Update transaction display with new payee name
+                hideModal();
+            });
+            
+            const deleteBtn = document.getElementById('delete-payee');
+            deleteBtn.addEventListener('click', () => {
+                // Check if payee has transactions
+                const hasTransactions = appState.transactions.some(t => t.payeeId === payee.id);
+                
+                if (hasTransactions) {
+                    alert('Cannot delete payee with transactions. Remove transactions first.');
+                    return;
+                }
+                
+                // Remove payee
+                const index = appState.payees.findIndex(p => p.id === payee.id);
+                if (index !== -1) {
+                    appState.payees.splice(index, 1);
+                    renderPayees();
+                    hideModal();
+                }
+            });
+        }
         
-        const deleteBtn = document.getElementById('delete-payee');
-        deleteBtn.addEventListener('click', () => {
-            // Check if payee has transactions
-            const hasTransactions = appState.transactions.some(t => t.payeeId === payee.id);
-            
-            if (hasTransactions) {
-                alert('Cannot delete payee with transactions. Remove transactions first.');
+        function showAddTransactionModal() {
+            // If no accounts, envelopes, or payees, show message
+            if (appState.accounts.length === 0 || appState.envelopes.length === 0 || appState.payees.length === 0) {
+                let missingItems = [];
+                if (appState.accounts.length === 0) missingItems.push('accounts');
+                if (appState.envelopes.length === 0) missingItems.push('envelopes');
+                if (appState.payees.length === 0) missingItems.push('payees');
+                
+                const content = `
+                    <div class="text-center py-4">
+                        <p class="mb-4">You need to create ${missingItems.join(' and ')} first before adding a transaction.</p>
+                    </div>
+                `;
+                
+                showModal('Missing Information', content);
                 return;
             }
             
-            // Remove payee
-            const index = appState.payees.findIndex(p => p.id === payee.id);
-            if (index !== -1) {
-                appState.payees.splice(index, 1);
-                renderPayees();
-                hideModal();
-            }
-        });
-    }
-    
-    function showAddTransactionModal() {
-        // If no accounts, envelopes, or payees, show message
-        if (appState.accounts.length === 0 || appState.envelopes.length === 0 || appState.payees.length === 0) {
-            let missingItems = [];
-            if (appState.accounts.length === 0) missingItems.push('accounts');
-            if (appState.envelopes.length === 0) missingItems.push('envelopes');
-            if (appState.payees.length === 0) missingItems.push('payees');
+            let accountOptions = '';
+            appState.accounts.forEach(account => {
+                accountOptions += `<option value="${account.id}">${account.name}</option>`;
+            });
+            
+            let envelopeOptions = '';
+            appState.envelopes.forEach(envelope => {
+                const category = appState.categories.find(c => c.id === envelope.categoryId);
+                envelopeOptions += `<option value="${envelope.id}">${envelope.name} (${category ? category.name : 'Unknown category'})</option>`;
+            });
+            
+            let payeeOptions = '';
+            appState.payees.forEach(payee => {
+                payeeOptions += `<option value="${payee.id}">${payee.name}</option>`;
+            });
+            
+            const today = new Date().toISOString().split('T')[0];
             
             const content = `
-                <div class="text-center py-4">
-                    <p class="mb-4">You need to create ${missingItems.join(' and ')} first before adding a transaction.</p>
-                </div>
+                <form id="add-transaction-form" class="space-y-4">
+                    <div>
+                        <label class="block text-sm font-medium mb-1" for="transaction-date">Date</label>
+                        <input type="date" id="transaction-date" class="w-full p-2 rounded-md border border-gray-300 dark:border-gray-600 bg-light-input dark:bg-dark-input text-base" value="${today}" required>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium mb-1" for="transaction-amount">Amount</label>
+                        <input type="number" id="transaction-amount" class="w-full p-2 rounded-md border border-gray-300 dark:border-gray-600 bg-light-input dark:bg-dark-input text-base" step="0.01" min="0" required>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium mb-1" for="transaction-description">Description</label>
+                        <input type="text" id="transaction-description" class="w-full p-2 rounded-md border border-gray-300 dark:border-gray-600 bg-light-input dark:bg-dark-input text-base" required>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium mb-1" for="transaction-payee">Payee</label>
+                        <select id="transaction-payee" class="w-full p-2 rounded-md border border-gray-300 dark:border-gray-600 bg-light-input dark:bg-dark-input text-base" required>
+                            ${payeeOptions}
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium mb-1" for="transaction-envelope">Envelope</label>
+                        <select id="transaction-envelope" class="w-full p-2 rounded-md border border-gray-300 dark:border-gray-600 bg-light-input dark:bg-dark-input text-base" required>
+                            ${envelopeOptions}
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium mb-1" for="transaction-account">Account</label>
+                        <select id="transaction-account" class="w-full p-2 rounded-md border border-gray-300 dark:border-gray-600 bg-light-input dark:bg-dark-input text-base" required>
+                            ${accountOptions}
+                        </select>
+                    </div>
+                    <div class="pt-2">
+                        <button type="submit" class="w-full py-2 bg-primary text-white rounded-md hover:bg-secondary transition-colors">Add Transaction</button>
+                    </div>
+                </form>
             `;
             
-            showModal('Missing Information', content);
-            return;
+            showModal('Add Transaction', content);
+            
+            const form = document.getElementById('add-transaction-form');
+            form.addEventListener('submit', (e) => {
+                e.preventDefault();
+                const date = document.getElementById('transaction-date').value;
+                const amount = parseFloat(document.getElementById('transaction-amount').value);
+                const description = document.getElementById('transaction-description').value;
+                const payeeId = parseInt(document.getElementById('transaction-payee').value);
+                const envelopeId = parseInt(document.getElementById('transaction-envelope').value);
+                const accountId = parseInt(document.getElementById('transaction-account').value);
+                
+                addTransaction({ date, amount, description, payeeId, envelopeId, accountId });
+                hideModal();
+            });
         }
         
-        let accountOptions = '';
-        appState.accounts.forEach(account => {
-            accountOptions += `<option value="${account.id}">${account.name}</option>`;
-        });
-        
-        let envelopeOptions = '';
-        appState.envelopes.forEach(envelope => {
-            const category = appState.categories.find(c => c.id === envelope.categoryId);
-            envelopeOptions += `<option value="${envelope.id}">${envelope.name} (${category ? category.name : 'Unknown category'})</option>`;
-        });
-        
-        let payeeOptions = '';
-        appState.payees.forEach(payee => {
-            payeeOptions += `<option value="${payee.id}">${payee.name}</option>`;
-        });
-        
-        const today = new Date().toISOString().split('T')[0];
-        
-        const content = `
-            <form id="add-transaction-form" class="space-y-4">
-                <div>
-                    <label class="block text-sm font-medium mb-1" for="transaction-date">Date</label>
-                    <input type="date" id="transaction-date" class="w-full p-2 rounded-md border border-gray-300 dark:border-gray-600 bg-light-input dark:bg-dark-input text-base" value="${today}" required>
-                </div>
-                <div>
-                    <label class="block text-sm font-medium mb-1" for="transaction-amount">Amount</label>
-                    <input type="number" id="transaction-amount" class="w-full p-2 rounded-md border border-gray-300 dark:border-gray-600 bg-light-input dark:bg-dark-input text-base" step="0.01" min="0" required>
-                </div>
-                <div>
-                    <label class="block text-sm font-medium mb-1" for="transaction-description">Description</label>
-                    <input type="text" id="transaction-description" class="w-full p-2 rounded-md border border-gray-300 dark:border-gray-600 bg-light-input dark:bg-dark-input text-base" required>
-                </div>
-                <div>
-                    <label class="block text-sm font-medium mb-1" for="transaction-payee">Payee</label>
-                    <select id="transaction-payee" class="w-full p-2 rounded-md border border-gray-300 dark:border-gray-600 bg-light-input dark:bg-dark-input text-base" required>
-                        ${payeeOptions}
-                    </select>
-                </div>
-                <div>
-                    <label class="block text-sm font-medium mb-1" for="transaction-envelope">Envelope</label>
-                    <select id="transaction-envelope" class="w-full p-2 rounded-md border border-gray-300 dark:border-gray-600 bg-light-input dark:bg-dark-input text-base" required>
-                        ${envelopeOptions}
-                    </select>
-                </div>
-                <div>
-                    <label class="block text-sm font-medium mb-1" for="transaction-account">Account</label>
-                    <select id="transaction-account" class="w-full p-2 rounded-md border border-gray-300 dark:border-gray-600 bg-light-input dark:bg-dark-input text-base" required>
-                        ${accountOptions}
-                    </select>
-                </div>
-                <div class="pt-2">
-                    <button type="submit" class="w-full py-2 bg-primary text-white rounded-md hover:bg-secondary transition-colors">Add Transaction</button>
-                </div>
-            </form>
-        `;
-        
-        showModal('Add Transaction', content);
-        
-        const form = document.getElementById('add-transaction-form');
-        form.addEventListener('submit', (e) => {
-            e.preventDefault();
-            const date = document.getElementById('transaction-date').value;
-            const amount = parseFloat(document.getElementById('transaction-amount').value);
-            const description = document.getElementById('transaction-description').value;
-            const payeeId = parseInt(document.getElementById('transaction-payee').value);
-            const envelopeId = parseInt(document.getElementById('transaction-envelope').value);
-            const accountId = parseInt(document.getElementById('transaction-account').value);
+        function showEditTransactionModal(transaction) {
+            let accountOptions = '';
+            appState.accounts.forEach(account => {
+                const selected = account.id === transaction.accountId ? 'selected' : '';
+                accountOptions += `<option value="${account.id}" ${selected}>${account.name}</option>`;
+            });
             
-            addTransaction({ date, amount, description, payeeId, envelopeId, accountId });
-            hideModal();
-        });
-    }
-    
-    function showEditTransactionModal(transaction) {
-        let accountOptions = '';
-        appState.accounts.forEach(account => {
-            const selected = account.id === transaction.accountId ? 'selected' : '';
-            accountOptions += `<option value="${account.id}" ${selected}>${account.name}</option>`;
-        });
-        
-        let envelopeOptions = '';
-        appState.envelopes.forEach(envelope => {
-            const selected = envelope.id === transaction.envelopeId ? 'selected' : '';
-            const category = appState.categories.find(c => c.id === envelope.categoryId);
-            envelopeOptions += `<option value="${envelope.id}" ${selected}>${envelope.name} (${category ? category.name : 'Unknown category'})</option>`;
-        });
-        
-        let payeeOptions = '';
-        appState.payees.forEach(payee => {
-            const selected = payee.id === transaction.payeeId ? 'selected' : '';
-            payeeOptions += `<option value="${payee.id}" ${selected}>${payee.name}</option>`;
-        });
-        
-        const content = `
-            <form id="edit-transaction-form" class="space-y-4">
-                <div>
-                    <label class="block text-sm font-medium mb-1" for="transaction-date">Date</label>
-                    <input type="date" id="transaction-date" class="w-full p-2 rounded-md border border-gray-300 dark:border-gray-600 bg-light-input dark:bg-dark-input text-base" value="${transaction.date}" required>
-                </div>
-                <div>
-                    <label class="block text-sm font-medium mb-1" for="transaction-amount">Amount</label>
-                    <input type="number" id="transaction-amount" class="w-full p-2 rounded-md border border-gray-300 dark:border-gray-600 bg-light-input dark:bg-dark-input text-base" step="0.01" min="0" value="${transaction.amount}" required>
-                </div>
-                <div>
-                    <label class="block text-sm font-medium mb-1" for="transaction-description">Description</label>
-                    <input type="text" id="transaction-description" class="w-full p-2 rounded-md border border-gray-300 dark:border-gray-600 bg-light-input dark:bg-dark-input text-base" value="${transaction.description}" required>
-                </div>
-                <div>
-                    <label class="block text-sm font-medium mb-1" for="transaction-payee">Payee</label>
-                    <select id="transaction-payee" class="w-full p-2 rounded-md border border-gray-300 dark:border-gray-600 bg-light-input dark:bg-dark-input text-base" required>
-                        ${payeeOptions}
-                    </select>
-                </div>
-                <div>
-                    <label class="block text-sm font-medium mb-1" for="transaction-envelope">Envelope</label>
-                    <select id="transaction-envelope" class="w-full p-2 rounded-md border border-gray-300 dark:border-gray-600 bg-light-input dark:bg-dark-input text-base" required>
-                        ${envelopeOptions}
-                    </select>
-                </div>
-                <div>
-                    <label class="block text-sm font-medium mb-1" for="transaction-account">Account</label>
-                    <select id="transaction-account" class="w-full p-2 rounded-md border border-gray-300 dark:border-gray-600 bg-light-input dark:bg-dark-input text-base" required>
-                        ${accountOptions}
-                    </select>
-                </div>
-                <div class="pt-2 flex space-x-2">
-                    <button type="submit" class="flex-1 py-2 bg-primary text-white rounded-md hover:bg-secondary transition-colors">Update</button>
-                    <button type="button" id="delete-transaction" class="py-2 px-4 bg-red-500 text-white rounded-md hover:bg-red-600 transition-colors">
-                        <i class="fas fa-trash"></i>
-                    </button>
-                </div>
-            </form>
-        `;
-        
-        showModal('Edit Transaction', content);
-        
-        const form = document.getElementById('edit-transaction-form');
-        form.addEventListener('submit', (e) => {
-            e.preventDefault();
-            const date = document.getElementById('transaction-date').value;
-            const newAmount = parseFloat(document.getElementById('transaction-amount').value);
-            const description = document.getElementById('transaction-description').value;
-            const payeeId = parseInt(document.getElementById('transaction-payee').value);
-            const newEnvelopeId = parseInt(document.getElementById('transaction-envelope').value);
-            const accountId = parseInt(document.getElementById('transaction-account').value);
+            let envelopeOptions = '';
+            appState.envelopes.forEach(envelope => {
+                const selected = envelope.id === transaction.envelopeId ? 'selected' : '';
+                const category = appState.categories.find(c => c.id === envelope.categoryId);
+                envelopeOptions += `<option value="${envelope.id}" ${selected}>${envelope.name} (${category ? category.name : 'Unknown category'})</option>`;
+            });
             
-            // Update spent amount on old envelope
-            if (transaction.envelopeId) {
-                const oldEnvelope = appState.envelopes.find(e => e.id === transaction.envelopeId);
-                if (oldEnvelope) {
-                    oldEnvelope.spent -= transaction.amount;
-                    if (oldEnvelope.spent < 0) oldEnvelope.spent = 0;
+            let payeeOptions = '';
+            appState.payees.forEach(payee => {
+                const selected = payee.id === transaction.payeeId ? 'selected' : '';
+                payeeOptions += `<option value="${payee.id}" ${selected}>${payee.name}</option>`;
+            });
+            
+            const content = `
+                <form id="edit-transaction-form" class="space-y-4">
+                    <div>
+                        <label class="block text-sm font-medium mb-1" for="transaction-date">Date</label>
+                        <input type="date" id="transaction-date" class="w-full p-2 rounded-md border border-gray-300 dark:border-gray-600 bg-light-input dark:bg-dark-input text-base" value="${transaction.date}" required>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium mb-1" for="transaction-amount">Amount</label>
+                        <input type="number" id="transaction-amount" class="w-full p-2 rounded-md border border-gray-300 dark:border-gray-600 bg-light-input dark:bg-dark-input text-base" step="0.01" min="0" value="${transaction.amount}" required>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium mb-1" for="transaction-description">Description</label>
+                        <input type="text" id="transaction-description" class="w-full p-2 rounded-md border border-gray-300 dark:border-gray-600 bg-light-input dark:bg-dark-input text-base" value="${transaction.description}" required>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium mb-1" for="transaction-payee">Payee</label>
+                        <select id="transaction-payee" class="w-full p-2 rounded-md border border-gray-300 dark:border-gray-600 bg-light-input dark:bg-dark-input text-base" required>
+                            ${payeeOptions}
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium mb-1" for="transaction-envelope">Envelope</label>
+                        <select id="transaction-envelope" class="w-full p-2 rounded-md border border-gray-300 dark:border-gray-600 bg-light-input dark:bg-dark-input text-base" required>
+                            ${envelopeOptions}
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium mb-1" for="transaction-account">Account</label>
+                        <select id="transaction-account" class="w-full p-2 rounded-md border border-gray-300 dark:border-gray-600 bg-light-input dark:bg-dark-input text-base" required>
+                            ${accountOptions}
+                        </select>
+                    </div>
+                    <div class="pt-2 flex space-x-2">
+                        <button type="submit" class="flex-1 py-2 bg-primary text-white rounded-md hover:bg-secondary transition-colors">Update</button>
+                        <button type="button" id="delete-transaction" class="py-2 px-4 bg-red-500 text-white rounded-md hover:bg-red-600 transition-colors">
+                            <i class="fas fa-trash"></i>
+                        </button>
+                    </div>
+                </form>
+            `;
+            
+            showModal('Edit Transaction', content);
+            
+            const form = document.getElementById('edit-transaction-form');
+            form.addEventListener('submit', (e) => {
+                e.preventDefault();
+                const date = document.getElementById('transaction-date').value;
+                const newAmount = parseFloat(document.getElementById('transaction-amount').value);
+                const description = document.getElementById('transaction-description').value;
+                const payeeId = parseInt(document.getElementById('transaction-payee').value);
+                const newEnvelopeId = parseInt(document.getElementById('transaction-envelope').value);
+                const accountId = parseInt(document.getElementById('transaction-account').value);
+                
+                // Update spent amount on old envelope
+                if (transaction.envelopeId) {
+                    const oldEnvelope = appState.envelopes.find(e => e.id === transaction.envelopeId);
+                    if (oldEnvelope) {
+                        oldEnvelope.spent -= transaction.amount;
+                        if (oldEnvelope.spent < 0) oldEnvelope.spent = 0;
+                    }
                 }
-            }
-            
-            // Update transaction
-            transaction.date = date;
-            transaction.amount = newAmount;
-            transaction.description = description;
-            transaction.payeeId = payeeId;
-            transaction.envelopeId = newEnvelopeId;
-            transaction.accountId = accountId;
-            
-            // Update spent amount on new envelope
-            if (newEnvelopeId) {
-                const newEnvelope = appState.envelopes.find(e => e.id === newEnvelopeId);
-                if (newEnvelope) {
-                    newEnvelope.spent += newAmount;
+                
+                // Update transaction
+                transaction.date = date;
+                transaction.amount = newAmount;
+                transaction.description = description;
+                transaction.payeeId = payeeId;
+                transaction.envelopeId = newEnvelopeId;
+                transaction.accountId = accountId;
+                
+                // Update spent amount on new envelope
+                if (newEnvelopeId) {
+                    const newEnvelope = appState.envelopes.find(e => e.id === newEnvelopeId);
+                    if (newEnvelope) {
+                        newEnvelope.spent += newAmount;
+                    }
                 }
-            }
-            
-            renderTransactions();
-            renderCategories();
-            updateBalances();
-            hideModal();
-        });
-        
-        const deleteBtn = document.getElementById('delete-transaction');
-        deleteBtn.addEventListener('click', () => {
-            // Update envelope spent amount
-            if (transaction.envelopeId) {
-                const envelope = appState.envelopes.find(e => e.id === transaction.envelopeId);
-                if (envelope) {
-                    envelope.spent -= transaction.amount;
-                    if (envelope.spent < 0) envelope.spent = 0;
-                }
-            }
-            
-            // Remove transaction
-            const index = appState.transactions.findIndex(t => t.id === transaction.id);
-            if (index !== -1) {
-                appState.transactions.splice(index, 1);
+                
                 renderTransactions();
                 renderCategories();
                 updateBalances();
                 hideModal();
-            }
-        });
-    }
-    
-    // Helper Functions
-    function formatDate(dateString) {
-        const options = { month: 'short', day: 'numeric' };
-        const date = new Date(dateString);
-        return date.toLocaleDateString('en-US', options);
-    }
-    
-    function getDaysDiff(dateString) {
-        const today = new Date();
-        today.setHours(0, 0, 0, 0);
-        
-        const targetDate = new Date(dateString);
-        targetDate.setHours(0, 0, 0, 0);
-        
-        const diffTime = targetDate - today;
-        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-        
-        return diffDays;
-    }
-    
-    function getProgressColor(percent) {
-        if (percent > 90) {
-            return '#EF4444'; // Red (danger)
-        } else if (percent > 75) {
-            return '#F59E0B'; // Amber (warning)
-        } else {
-            return '#10B981'; // Green (good)
+            });
+            
+            const deleteBtn = document.getElementById('delete-transaction');
+            deleteBtn.addEventListener('click', () => {
+                // Update envelope spent amount
+                if (transaction.envelopeId) {
+                    const envelope = appState.envelopes.find(e => e.id === transaction.envelopeId);
+                    if (envelope) {
+                        envelope.spent -= transaction.amount;
+                        if (envelope.spent < 0) envelope.spent = 0;
+                    }
+                }
+                
+                // Remove transaction
+                const index = appState.transactions.findIndex(t => t.id === transaction.id);
+                if (index !== -1) {
+                    appState.transactions.splice(index, 1);
+                    renderTransactions();
+                    renderCategories();
+                    updateBalances();
+                    hideModal();
+                }
+            });
         }
-    }
-    
-    // Event Listeners
-    elements.navButtons.forEach(btn => {
-        btn.addEventListener('click', () => {
-            const targetPage = btn.getAttribute('data-page');
+        
+        // Helper Functions
+        function formatDate(dateString) {
+            const options = { month: 'short', day: 'numeric' };
+            const date = new Date(dateString);
+            return date.toLocaleDateString('en-US', options);
+        }
+        
+        function getDaysDiff(dateString) {
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
             
-            // Hide all pages and remove active class from nav buttons
-            document.querySelectorAll('.page').forEach(page => {
-                page.classList.remove('active');
-            });
-            elements.navButtons.forEach(navBtn => {
-                navBtn.classList.remove('active');
-            });
+            const targetDate = new Date(dateString);
+            targetDate.setHours(0, 0, 0, 0);
             
-            // Show target page and set active class to button
-            document.getElementById(targetPage).classList.add('active');
-            btn.classList.add('active');
+            const diffTime = targetDate - today;
+            const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+            
+            return diffDays;
+        }
+        
+        function getProgressColor(percent) {
+            if (percent > 90) {
+                return '#EF4444'; // Red (danger)
+            } else if (percent > 75) {
+                return '#F59E0B'; // Amber (warning)
+            } else {
+                return '#10B981'; // Green (good)
+            }
+        }
+        
+        // Event Listeners
+        elements.navButtons.forEach(btn => {
+            btn.addEventListener('click', () => {
+                const targetPage = btn.getAttribute('data-page');
+                
+                // Hide all pages and remove active class from nav buttons
+                document.querySelectorAll('.page').forEach(page => {
+                    page.classList.remove('active');
+                });
+                elements.navButtons.forEach(navBtn => {
+                    navBtn.classList.remove('active');
+                });
+                
+                // Show target page and set active class to button
+                document.getElementById(targetPage).classList.add('active');
+                btn.classList.add('active');
+            });
         });
-    });
-    
-    elements.themeToggle.addEventListener('click', () => {
-        document.documentElement.classList.toggle('dark');
-    });
-    
-    elements.settingsBtn.addEventListener('click', showSettingsModal);
-    elements.syncBtn.addEventListener('click', saveData);
-    
-    elements.addBtns.account.addEventListener('click', showAddAccountModal);
-    elements.addBtns.envelope.addEventListener('click', showAddEnvelopeModal);
-    elements.addBtns.transaction.addEventListener('click', showAddTransactionModal);
-    elements.addBtns.payee.addEventListener('click', showAddPayeeModal);
-    
-    // File System Access API Functions
-    async function openFile() {
-        try {
-            // Check if the File System Access API is supported
-            if (!window.showOpenFilePicker) {
-                alert('File System Access API is not supported in your browser. Try using Chrome or Edge.');
+        
+        elements.themeToggle.addEventListener('click', () => {
+            document.documentElement.classList.toggle('dark');
+        });
+        
+        elements.settingsBtn.addEventListener('click', showSettingsModal);
+        elements.syncBtn.addEventListener('click', syncData);
+        
+        elements.addBtns.account.addEventListener('click', showAddAccountModal);
+        elements.addBtns.envelope.addEventListener('click', showAddEnvelopeModal);
+        elements.addBtns.transaction.addEventListener('click', showAddTransactionModal);
+        elements.addBtns.payee.addEventListener('click', showAddPayeeModal);
+        
+        // WebDAV Settings Modal
+        function showSettingsModal() {
+            const content = `
+                <div class="space-y-4">
+                    <div class="flex items-center justify-between">
+                        <span class="text-sm font-medium">WebDAV Sync</span>
+                        <label class="relative inline-flex items-center cursor-pointer">
+                            <input type="checkbox" id="webdav-enabled" class="sr-only peer" ${appState.webdav.enabled ? 'checked' : ''}>
+                            <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-primary/20 dark:peer-focus:ring-primary/30 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-primary"></div>
+                        </label>
+                    </div>
+                    
+                    <div id="webdav-settings" class="${appState.webdav.enabled ? '' : 'hidden'} space-y-4">
+                        <div>
+                            <label class="block text-sm font-medium mb-1" for="webdav-url">WebDAV Server URL</label>
+                            <input type="url" id="webdav-url" placeholder="https://example.com/webdav/" class="w-full p-2 rounded-md border border-gray-300 dark:border-gray-600 bg-light-input dark:bg-dark-input text-base" value="${appState.webdav.url}">
+                            <p class="text-xs text-gray-500 mt-1">Example: https://nextcloud.example.com/remote.php/webdav/</p>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium mb-1" for="webdav-username">Username</label>
+                            <input type="text" id="webdav-username" class="w-full p-2 rounded-md border border-gray-300 dark:border-gray-600 bg-light-input dark:bg-dark-input text-base" value="${appState.webdav.username}">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium mb-1" for="webdav-password">Password</label>
+                            <input type="password" id="webdav-password" class="w-full p-2 rounded-md border border-gray-300 dark:border-gray-600 bg-light-input dark:bg-dark-input text-base" value="${appState.webdav.password}" placeholder="••••••••">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium mb-1" for="encryption-key">Encryption Key (Optional)</label>
+                            <input type="password" id="encryption-key" class="w-full p-2 rounded-md border border-gray-300 dark:border-gray-600 bg-light-input dark:bg-dark-input text-base" value="${appState.webdav.encryptionKey}" placeholder="Leave blank for no encryption">
+                            <p class="text-xs text-gray-500 mt-1">Enter a secure passphrase to encrypt your data</p>
+                        </div>
+                        <div>
+                            <button id="test-connection" class="w-full py-2 mt-2 bg-primary text-white rounded-md hover:bg-secondary transition-colors">
+                                Test Connection
+                            </button>
+                            <div id="connection-status" class="text-center mt-2 text-sm hidden"></div>
+                        </div>
+                        <div class="border-t border-gray-200 dark:border-gray-700 pt-4 mt-4">
+                            <div class="flex items-center justify-between mb-2">
+                                <span class="text-sm font-medium">Auto Sync</span>
+                                <label class="relative inline-flex items-center cursor-pointer">
+                                    <input type="checkbox" id="auto-sync" class="sr-only peer" ${appState.syncSettings.autoSync ? 'checked' : ''}>
+                                    <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-primary/20 dark:peer-focus:ring-primary/30 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-primary"></div>
+                                </label>
+                            </div>
+                            <select id="sync-interval" class="w-full p-2 rounded-md border border-gray-300 dark:border-gray-600 bg-light-input dark:bg-dark-input text-base" ${!appState.syncSettings.autoSync ? 'disabled' : ''}>
+                                <option value="60000" ${appState.webdav.syncInterval === 60000 ? 'selected' : ''}>Every minute</option>
+                                <option value="300000" ${appState.webdav.syncInterval === 300000 ? 'selected' : ''}>Every 5 minutes</option>
+                                <option value="900000" ${appState.webdav.syncInterval === 900000 ? 'selected' : ''}>Every 15 minutes</option>
+                                <option value="3600000" ${appState.webdav.syncInterval === 3600000 ? 'selected' : ''}>Every hour</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="pt-2">
+                        <button id="save-settings" class="w-full py-2 bg-primary text-white rounded-md hover:bg-secondary transition-colors">Save Settings</button>
+                    </div>
+                </div>
+            `;
+            
+            showModal('Settings', content);
+            
+            // Event listeners for the settings modal
+            const webdavEnabledToggle = document.getElementById('webdav-enabled');
+            const webdavSettings = document.getElementById('webdav-settings');
+            const autoSyncToggle = document.getElementById('auto-sync');
+            const syncIntervalSelect = document.getElementById('sync-interval');
+            const testConnectionBtn = document.getElementById('test-connection');
+            const connectionStatus = document.getElementById('connection-status');
+            const saveSettingsBtn = document.getElementById('save-settings');
+            
+            webdavEnabledToggle.addEventListener('change', () => {
+                if (webdavEnabledToggle.checked) {
+                    webdavSettings.classList.remove('hidden');
+                } else {
+                    webdavSettings.classList.add('hidden');
+                }
+            });
+            
+            autoSyncToggle.addEventListener('change', () => {
+                syncIntervalSelect.disabled = !autoSyncToggle.checked;
+            });
+            
+            testConnectionBtn.addEventListener('click', async () => {
+                const url = document.getElementById('webdav-url').value;
+                const username = document.getElementById('webdav-username').value;
+                const password = document.getElementById('webdav-password').value;
+                
+                connectionStatus.classList.remove('hidden', 'text-green-500', 'text-red-500');
+                connectionStatus.classList.add('text-gray-500');
+                connectionStatus.textContent = 'Testing connection...';
+                
+                try {
+                    const result = await testWebDAVConnection(url, username, password);
+                    if (result.success) {
+                        connectionStatus.classList.remove('text-gray-500');
+                        connectionStatus.classList.add('text-green-500');
+                        connectionStatus.textContent = 'Connection successful!';
+                    } else {
+                        connectionStatus.classList.remove('text-gray-500');
+                        connectionStatus.classList.add('text-red-500');
+                        connectionStatus.textContent = `Error: ${result.error}`;
+                    }
+                } catch (err) {
+                    connectionStatus.classList.remove('text-gray-500');
+                    connectionStatus.classList.add('text-red-500');
+                    connectionStatus.textContent = `Error: ${err.message}`;
+                }
+            });
+            
+            saveSettingsBtn.addEventListener('click', () => {
+                const enabled = webdavEnabledToggle.checked;
+                const url = document.getElementById('webdav-url').value;
+                const username = document.getElementById('webdav-username').value;
+                const password = document.getElementById('webdav-password').value;
+                const encryptionKey = document.getElementById('encryption-key').value;
+                const autoSync = autoSyncToggle.checked;
+                const syncInterval = parseInt(syncIntervalSelect.value);
+                
+                // Update WebDAV settings
+                appState.webdav.enabled = enabled;
+                appState.webdav.url = url;
+                appState.webdav.username = username;
+                appState.webdav.password = password;
+                appState.webdav.encryptionKey = encryptionKey;
+                appState.syncSettings.autoSync = autoSync;
+                appState.webdav.syncInterval = syncInterval;
+                
+                // Clear any existing auto-sync interval
+                if (window.autoSyncInterval) {
+                    clearInterval(window.autoSyncInterval);
+                    window.autoSyncInterval = null;
+                }
+                
+                // Set up auto-sync if enabled
+                if (enabled && autoSync) {
+                    window.autoSyncInterval = setInterval(syncData, syncInterval);
+                }
+                
+                // If WebDAV is enabled, try an initial sync
+                if (enabled) {
+                    updateSyncStatus('disconnected');
+                    syncData();
+                } else {
+                    updateSyncStatus('disconnected');
+                }
+                
+                hideModal();
+            });
+        }
+        
+        // WebDAV Client Functions
+        
+        // Test WebDAV connection
+        async function testWebDAVConnection(url, username, password) {
+            try {
+                const response = await fetch(url, {
+                    method: 'PROPFIND',
+                    headers: {
+                        'Authorization': 'Basic ' + btoa(username + ':' + password),
+                        'Depth': '0',
+                        'Content-Type': 'application/xml; charset=utf-8'
+                    }
+                });
+                
+                if (response.ok || response.status === 207) {
+                    return { success: true };
+                } else {
+                    return { 
+                        success: false, 
+                        error: `Server responded with status ${response.status}` 
+                    };
+                }
+            } catch (error) {
+                return { 
+                    success: false, 
+                    error: error.message 
+                };
+            }
+        }
+        
+        // Encrypt data before storing
+        function encryptData(data, key) {
+            if (!key || key.length === 0) {
+                return JSON.stringify(data);
+            }
+            
+            try {
+                // Simple XOR encryption (for demo purposes)
+                // In a real app, use a proper encryption library
+                const str = JSON.stringify(data);
+                let encrypted = '';
+                for (let i = 0; i < str.length; i++) {
+                    const charCode = str.charCodeAt(i) ^ key.charCodeAt(i % key.length);
+                    encrypted += String.fromCharCode(charCode);
+                }
+                return btoa(encrypted); // Base64 encode for safer storage
+            } catch (e) {
+                console.log('Encryption error:', e);
+                return JSON.stringify(data);
+            }
+        }
+        
+        // Decrypt data after retrieving
+        function decryptData(encryptedData, key) {
+            if (!key || key.length === 0) {
+                return JSON.parse(encryptedData);
+            }
+            
+            try {
+                // Simple XOR decryption (for demo purposes)
+                const encrypted = atob(encryptedData); // Base64 decode
+                let decrypted = '';
+                for (let i = 0; i < encrypted.length; i++) {
+                    const charCode = encrypted.charCodeAt(i) ^ key.charCodeAt(i % key.length);
+                    decrypted += String.fromCharCode(charCode);
+                }
+                return JSON.parse(decrypted);
+            } catch (e) {
+                console.log('Decryption error:', e);
+                throw new Error('Unable to decrypt data. Wrong encryption key?');
+            }
+        }
+        
+        // Update sync status indicator
+        function updateSyncStatus(status, message = '') {
+            appState.webdav.status = status;
+            
+            // Update the sync button icon
+            if (status === 'syncing') {
+                elements.syncBtn.innerHTML = '<i class="fas fa-sync-alt fa-spin"></i>';
+                elements.syncStatus.classList.add('hidden');
+            } else if (status === 'connected') {
+                elements.syncBtn.innerHTML = '<i class="fas fa-sync-alt"></i>';
+                elements.syncStatus.classList.remove('hidden');
+                elements.syncStatus.classList.remove('bg-red-500');
+                elements.syncStatus.classList.add('bg-green-500');
+            } else if (status === 'error') {
+                elements.syncBtn.innerHTML = '<i class="fas fa-sync-alt"></i>';
+                elements.syncStatus.classList.remove('hidden');
+                elements.syncStatus.classList.remove('bg-green-500');
+                elements.syncStatus.classList.add('bg-red-500');
+            } else {
+                elements.syncBtn.innerHTML = '<i class="fas fa-sync-alt"></i>';
+                elements.syncStatus.classList.add('hidden');
+            }
+            
+            // Show a notification if needed
+            if (message && appState.syncSettings.notifyOnSync) {
+                showNotification(message, status === 'error' ? 'error' : 'success');
+            }
+        }
+        
+        // Show a temporary notification
+        function showNotification(message, type = 'success') {
+            // Remove any existing notifications
+            const existingNotification = document.getElementById('notification');
+            if (existingNotification) {
+                existingNotification.remove();
+            }
+            
+            // Create a new notification
+            const notification = document.createElement('div');
+            notification.id = 'notification';
+            notification.className = `fixed bottom-4 left-0 right-0 mx-auto w-5/6 max-w-sm p-3 rounded-md shadow-lg ${
+                type === 'error' ? 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-100' : 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-100'
+            } slide-in`;
+            
+            notification.innerHTML = `
+                <div class="flex items-center justify-between">
+                    <div class="flex items-center">
+                        <i class="fas ${type === 'error' ? 'fa-exclamation-circle' : 'fa-check-circle'} mr-2"></i>
+                        <span>${message}</span>
+                    </div>
+                    <button class="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+            `;
+            
+            document.body.appendChild(notification);
+            
+            // Add event listener to close button
+            notification.querySelector('button').addEventListener('click', () => {
+                notification.remove();
+            });
+            
+            // Auto-remove after 5 seconds
+            setTimeout(() => {
+                if (document.getElementById('notification')) {
+                    notification.style.opacity = '0';
+                    notification.style.transform = 'translateY(20px)';
+                    notification.style.transition = 'opacity 0.5s, transform 0.5s';
+                    
+                    // Remove from DOM after transition
+                    setTimeout(() => {
+                        if (document.getElementById('notification')) {
+                            notification.remove();
+                        }
+                    }, 500);
+                }
+            }, 5000);
+        }
+        
+        // Upload data to WebDAV server
+        async function uploadToWebDAV(data) {
+            const { url, username, password, encryptionKey } = appState.webdav;
+            
+            if (!url || !username || !password) {
+                throw new Error('WebDAV connection details are missing');
+            }
+            
+            // Encrypt the data
+            const encryptedData = encryptData(data, encryptionKey);
+            
+            // Format the URL properly
+            const fileUrl = url.endsWith('/') ? url + 'envelope-budget.json' : url + '/envelope-budget.json';
+            
+            // Upload file
+            try {
+                const response = await fetch(fileUrl, {
+                    method: 'PUT',
+                    headers: {
+                        'Authorization': 'Basic ' + btoa(username + ':' + password),
+                        'Content-Type': 'application/json'
+                    },
+                    body: encryptedData
+                });
+                
+                if (!response.ok) {
+                    throw new Error(`Failed to upload data: ${response.status} ${response.statusText}`);
+                }
+                
+                return { success: true };
+            } catch (error) {
+                return { success: false, error: error.message };
+            }
+        }
+        
+        // Download data from WebDAV server
+        async function downloadFromWebDAV() {
+            const { url, username, password, encryptionKey } = appState.webdav;
+            
+            if (!url || !username || !password) {
+                throw new Error('WebDAV connection details are missing');
+            }
+            
+            // Format the URL properly
+            const fileUrl = url.endsWith('/') ? url + 'envelope-budget.json' : url + '/envelope-budget.json';
+            
+            // Download file
+            try {
+                const response = await fetch(fileUrl, {
+                    method: 'GET',
+                    headers: {
+                        'Authorization': 'Basic ' + btoa(username + ':' + password)
+                    }
+                });
+                
+                if (response.status === 404) {
+                    return { success: false, error: 'File not found', notFound: true };
+                }
+                
+                if (!response.ok) {
+                    throw new Error(`Failed to download data: ${response.status} ${response.statusText}`);
+                }
+                
+                const encryptedData = await response.text();
+                
+                // Decrypt the data
+                try {
+                    const decryptedData = decryptData(encryptedData, encryptionKey);
+                    return { success: true, data: decryptedData };
+                } catch (error) {
+                    return { success: false, error: 'Failed to decrypt data. Wrong encryption key?' };
+                }
+            } catch (error) {
+                return { success: false, error: error.message };
+            }
+        }
+        
+        // Check if file exists on WebDAV server
+        async function checkFileExistsOnWebDAV() {
+            const { url, username, password } = appState.webdav;
+            
+            if (!url || !username || !password) {
+                throw new Error('WebDAV connection details are missing');
+            }
+            
+            // Format the URL properly
+            const fileUrl = url.endsWith('/') ? url + 'envelope-budget.json' : url + '/envelope-budget.json';
+            
+            try {
+                const response = await fetch(fileUrl, {
+                    method: 'HEAD',
+                    headers: {
+                        'Authorization': 'Basic ' + btoa(username + ':' + password)
+                    }
+                });
+                
+                return { exists: response.ok, statusCode: response.status };
+            } catch (error) {
+                return { exists: false, error: error.message };
+            }
+        }
+        
+        // Main sync function
+        async function syncData() {
+            if (!appState.webdav.enabled) {
                 return;
             }
             
-            // Open file picker
-            const [fileHandle] = await window.showOpenFilePicker({
-                types: [{
-                    description: 'Budget Files',
-                    accept: {
-                        'application/json': ['.json']
-                    }
-                }],
-                multiple: false
-            });
-            
-            // Get the file
-            const file = await fileHandle.getFile();
-            const contents = await file.text();
-            
-            // Parse the file contents
-            const data = JSON.parse(contents);
-            
-            // Update app state with the loaded data
-            appState.accounts = data.accounts || [];
-            appState.categories = data.categories || [];
-            appState.envelopes = data.envelopes || [];
-            appState.transactions = data.transactions || [];
-            appState.payees = data.payees || [];
-            appState.nextIds = data.nextIds || {
-                account: 1,
-                category: 1,
-                envelope: 1,
-                transaction: 1,
-                payee: 1
-            };
-            
-            // Store the file handle for future saves
-            appState.fileSettings.fileHandle = fileHandle;
-            appState.fileSettings.lastSync = new Date();
-            
-            // Update UI
-            renderAccounts();
-            renderCategories();
-            renderTransactions();
-            renderPayees();
-            updateBalances();
-            
-            updateSyncStatus('connected', 'File loaded successfully');
-            
-            // Start auto-save if enabled
-            if (appState.fileSettings.autoSave) {
-                startAutoSave();
-            }
-            
-        } catch (error) {
-            if (error.name !== 'AbortError') {
-                updateSyncStatus('error', `Error loading file: ${error.message}`);
-            }
-        }
-    }
-    
-    async function saveData() {
-        try {
             updateSyncStatus('syncing');
             
-            // Prepare data to save
-            const dataToSave = {
-                accounts: appState.accounts,
-                categories: appState.categories,
-                envelopes: appState.envelopes,
-                transactions: appState.transactions,
-                payees: appState.payees,
-                nextIds: appState.nextIds
-            };
-            
-            let fileHandle = appState.fileSettings.fileHandle;
-            
-            // If we don't have a file handle, show save dialog
-            if (!fileHandle) {
-                fileHandle = await window.showSaveFilePicker({
-                    types: [{
-                        description: 'Budget Files',
-                        accept: {
-                            'application/json': ['.json']
-                        }
-                    }],
-                    suggestedName: 'envelope-budget.json'
-                });
+            try {
+                // Check if file exists
+                const checkResult = await checkFileExistsOnWebDAV();
                 
-                appState.fileSettings.fileHandle = fileHandle;
-            }
-            
-            // Create a writable stream
-            const writable = await fileHandle.createWritable();
-            
-            // Write the contents
-            await writable.write(JSON.stringify(dataToSave, null, 2));
-            
-            // Close the file
-            await writable.close();
-            
-            appState.fileSettings.lastSync = new Date();
-            updateSyncStatus('connected', 'Data saved successfully');
-            
-        } catch (error) {
-            if (error.name !== 'AbortError') {
-                updateSyncStatus('error', `Error saving file: ${error.message}`);
-            }
-        }
-    }
-    
-    async function saveAsNewFile() {
-        try {
-            updateSyncStatus('syncing');
-            
-            // Prepare data to save
-            const dataToSave = {
-                accounts: appState.accounts,
-                categories: appState.categories,
-                envelopes: appState.envelopes,
-                transactions: appState.transactions,
-                payees: appState.payees,
-                nextIds: appState.nextIds
-            };
-            
-            // Show save dialog
-            const fileHandle = await window.showSaveFilePicker({
-                types: [{
-                    description: 'Budget Files',
-                    accept: {
-                        'application/json': ['.json']
+                if (checkResult.exists) {
+                    // Download data
+                    const downloadResult = await downloadFromWebDAV();
+                    
+                    if (downloadResult.success) {
+                        // Merge data from server with local data (using server as source of truth)
+                        const mergedData = mergeData(downloadResult.data);
+                        
+                        // Update app state with merged data
+                        appState.accounts = mergedData.accounts;
+                        appState.categories = mergedData.categories;
+                        appState.envelopes = mergedData.envelopes;
+                        appState.transactions = mergedData.transactions;
+                        appState.payees = mergedData.payees;
+                        appState.nextIds = mergedData.nextIds;
+                        
+                        // Update UI
+                        renderAccounts();
+                        renderCategories();
+                        renderTransactions();
+                        renderPayees();
+                        updateBalances();
+                        
+                        updateSyncStatus('connected', 'Sync completed successfully');
+                        appState.webdav.lastSync = new Date();
+                    } else {
+                        updateSyncStatus('error', `Sync failed: ${downloadResult.error}`);
                     }
-                }],
-                suggestedName: 'envelope-budget.json'
-            });
-            
-            // Create a writable stream
-            const writable = await fileHandle.createWritable();
-            
-            // Write the contents
-            await writable.write(JSON.stringify(dataToSave, null, 2));
-            
-            // Close the file
-            await writable.close();
-            
-            // Update file handle
-            appState.fileSettings.fileHandle = fileHandle;
-            appState.fileSettings.lastSync = new Date();
-            
-            updateSyncStatus('connected', 'Data saved successfully');
-            
-        } catch (error) {
-            if (error.name !== 'AbortError') {
-                updateSyncStatus('error', `Error saving file: ${error.message}`);
-            }
-        }
-    }
-    
-    function startAutoSave() {
-        // Clear any existing interval
-        if (window.autoSaveInterval) {
-            clearInterval(window.autoSaveInterval);
-        }
-        
-        // Set up new interval
-        window.autoSaveInterval = setInterval(() => {
-            if (appState.fileSettings.fileHandle) {
-                saveData();
-            }
-        }, appState.fileSettings.saveInterval);
-    }
-    
-    function stopAutoSave() {
-        if (window.autoSaveInterval) {
-            clearInterval(window.autoSaveInterval);
-            window.autoSaveInterval = null;
-        }
-    }
-    
-    // Update sync status indicator
-    function updateSyncStatus(status, message = '') {
-        appState.fileSettings.status = status;
-        
-        // Update the sync button icon
-        if (status === 'syncing') {
-            elements.syncBtn.innerHTML = '<i class="fas fa-save fa-spin"></i>';
-            elements.syncStatus.classList.add('hidden');
-        } else if (status === 'connected') {
-            elements.syncBtn.innerHTML = '<i class="fas fa-save"></i>';
-            elements.syncStatus.classList.remove('hidden');
-            elements.syncStatus.classList.remove('bg-red-500');
-            elements.syncStatus.classList.add('bg-green-500');
-        } else if (status === 'error') {
-            elements.syncBtn.innerHTML = '<i class="fas fa-save"></i>';
-            elements.syncStatus.classList.remove('hidden');
-            elements.syncStatus.classList.remove('bg-green-500');
-            elements.syncStatus.classList.add('bg-red-500');
-        } else {
-            elements.syncBtn.innerHTML = '<i class="fas fa-save"></i>';
-            elements.syncStatus.classList.add('hidden');
-        }
-        
-        // Show a notification if needed
-        if (message) {
-            showNotification(message, status === 'error' ? 'error' : 'success');
-        }
-    }
-    
-    // Show a temporary notification
-    function showNotification(message, type = 'success') {
-        // Remove any existing notifications
-        const existingNotification = document.getElementById('notification');
-        if (existingNotification) {
-            existingNotification.remove();
-        }
-        
-        // Create a new notification
-        const notification = document.createElement('div');
-        notification.id = 'notification';
-        notification.className = `fixed bottom-4 left-0 right-0 mx-auto w-5/6 max-w-sm p-3 rounded-md shadow-lg ${
-            type === 'error' ? 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-100' : 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-100'
-        } slide-in`;
-        
-        notification.innerHTML = `
-            <div class="flex items-center justify-between">
-                <div class="flex items-center">
-                    <i class="fas ${type === 'error' ? 'fa-exclamation-circle' : 'fa-check-circle'} mr-2"></i>
-                    <span>${message}</span>
-                </div>
-                <button class="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200">
-                    <i class="fas fa-times"></i>
-                </button>
-            </div>
-        `;
-        
-        document.body.appendChild(notification);
-        
-        // Add event listener to close button
-        notification.querySelector('button').addEventListener('click', () => {
-            notification.remove();
-        });
-        
-        // Auto-remove after 5 seconds
-        setTimeout(() => {
-            if (document.getElementById('notification')) {
-                notification.style.opacity = '0';
-                notification.style.transform = 'translateY(20px)';
-                notification.style.transition = 'opacity 0.5s, transform 0.5s';
-                
-                // Remove from DOM after transition
-                setTimeout(() => {
-                    if (document.getElementById('notification')) {
-                        notification.remove();
+                } else {
+                    // File doesn't exist, upload our data
+                    const dataToUpload = {
+                        accounts: appState.accounts,
+                        categories: appState.categories,
+                        envelopes: appState.envelopes,
+                        transactions: appState.transactions,
+                        payees: appState.payees,
+                        nextIds: appState.nextIds
+                    };
+                    
+                    const uploadResult = await uploadToWebDAV(dataToUpload);
+                    
+                    if (uploadResult.success) {
+                        updateSyncStatus('connected', 'Initial data upload successful');
+                        appState.webdav.lastSync = new Date();
+                    } else {
+                        updateSyncStatus('error', `Upload failed: ${uploadResult.error}`);
                     }
-                }, 500);
+                }
+            } catch (error) {
+                updateSyncStatus('error', `Sync error: ${error.message}`);
             }
-        }, 5000);
-    }
-    
-    // Settings Modal
-    function showSettingsModal() {
-        const content = `
-            <div class="space-y-4">
-                <div class="flex items-center justify-between">
-                    <span class="text-sm font-medium">Auto Save</span>
-                    <label class="relative inline-flex items-center cursor-pointer">
-                        <input type="checkbox" id="auto-save" class="sr-only peer" ${appState.fileSettings.autoSave ? 'checked' : ''}>
-                        <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-primary/20 dark:peer-focus:ring-primary/30 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-primary"></div>
-                    </label>
-                </div>
-                <div>
-                    <label class="block text-sm font-medium mb-1" for="save-interval">Save Interval (minutes)</label>
-                    <input type="number" id="save-interval" class="w-full p-2 rounded-md border border-gray-300 dark:border-gray-600 bg-light-input dark:bg-dark-input text-base" min="1" value="${appState.fileSettings.saveInterval / 60000}" ${!appState.fileSettings.autoSave ? 'disabled' : ''}>
-                </div>
-                <div>
-                    <label class="block text-sm font-medium mb-1" for="encryption-key">Encryption Key (Optional)</label>
-                    <input type="password" id="encryption-key" class="w-full p-2 rounded-md border border-gray-300 dark:border-gray-600 bg-light-input dark:bg-dark-input text-base" value="${appState.fileSettings.encryptionKey}" placeholder="Leave blank for no encryption">
-                    <p class="text-xs text-gray-500 mt-1">Enter a secure passphrase to encrypt your data</p>
-                </div>
-                <div class="border-t border-gray-200 dark:border-gray-700 pt-4 mt-4">
-                    <div class="space-y-2">
-                        <button id="open-file-btn" class="w-full py-2 bg-primary text-white rounded-md hover:bg-secondary transition-colors">
-                            Open Budget File
-                        </button>
-                        <button id="save-as-btn" class="w-full py-2 bg-gray-200 text-gray-800 dark:bg-gray-700 dark:text-gray-200 rounded-md hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors">
-                            Save As New File
-                        </button>
-                    </div>
-                </div>
-                <div class="pt-2">
-                    <button id="save-settings" class="w-full py-2 bg-primary text-white rounded-md hover:bg-secondary transition-colors">Save Settings</button>
-                </div>
-            </div>
-        `;
+        }
         
-        showModal('Settings', content);
+        // Merge data from server with local data
+        function mergeData(serverData) {
+            // For simplicity, we'll use server data as the source of truth
+            // In a real app, you might want to implement a more sophisticated
+            // merge strategy that handles conflicts
+            return serverData;
+        }
         
-        // Event listeners for the settings modal
-        const autoSaveToggle = document.getElementById('auto-save');
-        const saveIntervalInput = document.getElementById('save-interval');
-        const openFileBtn = document.getElementById('open-file-btn');
-        const saveAsBtn = document.getElementById('save-as-btn');
-        const saveSettingsBtn = document.getElementById('save-settings');
-        
-        autoSaveToggle.addEventListener('change', () => {
-            saveIntervalInput.disabled = !autoSaveToggle.checked;
-        });
-        
-        openFileBtn.addEventListener('click', async () => {
-            hideModal();
-            await openFile();
-        });
-        
-        saveAsBtn.addEventListener('click', async () => {
-            hideModal();
-            await saveAsNewFile();
-        });
-        
-        saveSettingsBtn.addEventListener('click', () => {
-            const autoSave = autoSaveToggle.checked;
-            const saveInterval = parseInt(saveIntervalInput.value) * 60000; // Convert minutes to milliseconds
-            const encryptionKey = document.getElementById('encryption-key').value;
-            
-            // Update settings
-            appState.fileSettings.autoSave = autoSave;
-            appState.fileSettings.saveInterval = saveInterval;
-            appState.fileSettings.encryptionKey = encryptionKey;
-            
-            // Clear any existing auto-save interval
-            stopAutoSave();
-            
-            // Set up auto-save if enabled
-            if (autoSave && appState.fileSettings.fileHandle) {
-                startAutoSave();
-            }
-            
-            hideModal();
-        });
-    }
-    
-    // Initialize the app
-    function initApp() {
-        // Load sample data if no file is loaded
-        if (appState.accounts.length === 0 && 
-            appState.categories.length === 0 && 
-            appState.envelopes.length === 0) {
+        // Initialize the app
+        function initApp() {
+            // Load sample data
             initSampleData();
-        }
-        
-        // Render UI
-        renderAccounts();
-        renderCategories();
-        renderTransactions();
-        renderPayees();
-        updateBalances();
-        
-        // Set up auto-save if enabled
-        if (appState.fileSettings.autoSave && appState.fileSettings.fileHandle) {
-            startAutoSave();
-        }
-    }
-    
-    // Start the app
-    initApp();
-
-document.getElementById('file-input').addEventListener('change', (event) => {
-    const file = event.target.files[0];
-    if (!file) return;
-
-    const reader = new FileReader();
-    reader.onload = (e) => {
-        try {
-            const data = JSON.parse(e.target.result);
-            appState.accounts = data.accounts || [];
-            appState.categories = data.categories || [];
-            appState.envelopes = data.envelopes || [];
-            appState.transactions = data.transactions || [];
-            appState.payees = data.payees || [];
-            appState.nextIds = data.nextIds || {
-                account: 1,
-                category: 1,
-                envelope: 1,
-                transaction: 1,
-                payee: 1
-            };
-
+            
+            // Render UI
             renderAccounts();
             renderCategories();
             renderTransactions();
             renderPayees();
             updateBalances();
-
-            showNotification("Budget file loaded successfully.");
-        } catch (error) {
-            alert("Failed to parse the file.");
+            
+            // Set up auto-sync if enabled
+            if (appState.webdav.enabled && appState.syncSettings.autoSync) {
+                window.autoSyncInterval = setInterval(syncData, appState.webdav.syncInterval);
+                
+                // Try to sync immediately
+                syncData();
+            }
         }
-    };
-    reader.readAsText(file);
-});
-
-</script>
-</body> </html> ```
+        
+        // Start the app
+        initApp();
+    </script>
+</body>
+</html>
