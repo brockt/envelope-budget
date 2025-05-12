@@ -1,0 +1,1366 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Envelope Budget</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        primary: '#5D5CDE',
+                        secondary: '#6366F1',
+                        dark: {
+                            DEFAULT: '#1E1E1E',
+                            card: '#252525',
+                            input: '#333333'
+                        },
+                        light: {
+                            DEFAULT: '#FFFFFF',
+                            card: '#F9FAFB',
+                            input: '#F3F4F6'
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        /* Custom styles */
+        .envelope-progress {
+            height: 8px;
+            border-radius: 4px;
+            background-color: #E5E7EB;
+        }
+        .envelope-progress div {
+            height: 8px;
+            border-radius: 4px;
+        }
+        .dark .envelope-progress {
+            background-color: #4B5563;
+        }
+        .slide-in {
+            animation: slideIn 0.3s ease-out forwards;
+        }
+        .fade-in {
+            animation: fadeIn 0.3s ease-out forwards;
+        }
+        @keyframes slideIn {
+            from { transform: translateX(100%); }
+            to { transform: translateX(0); }
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+        .page {
+            display: none;
+        }
+        .page.active {
+            display: block;
+        }
+    </style>
+</head>
+<body class="bg-light dark:bg-dark text-gray-800 dark:text-gray-200 min-h-screen">
+    <!-- App Container -->
+    <div class="max-w-md mx-auto min-h-screen flex flex-col">
+        <!-- App Header -->
+        <header class="py-4 px-4 flex justify-between items-center border-b border-gray-200 dark:border-gray-700">
+            <h1 class="text-xl font-bold text-primary">Envelope Budget</h1>
+            <div class="flex space-x-3 items-center">
+                <button id="sync-btn" class="text-primary text-xl relative">
+                    <i class="fas fa-save"></i>
+                    <span id="sync-status" class="hidden absolute -top-1 -right-1 w-3 h-3 bg-green-500 rounded-full"></span>
+                </button>
+                <button id="settings-btn" class="text-primary text-xl">
+                    <i class="fas fa-cog"></i>
+                </button>
+                <button id="theme-toggle" class="text-xl">
+                    <i class="fas fa-moon dark:hidden"></i>
+                    <i class="fas fa-sun hidden dark:block"></i>
+                </button>
+            </div>
+        </header>
+        
+        <!-- Main Content Area -->
+        <main class="flex-1 overflow-y-auto">
+            <!-- Dashboard Page -->
+            <div id="dashboard-page" class="page active p-4">
+                <!-- Summary Cards -->
+                <div class="grid grid-cols-2 gap-4 mb-6">
+                    <div class="bg-light-card dark:bg-dark-card rounded-lg p-4 shadow">
+                        <h3 class="text-sm text-gray-500 dark:text-gray-400">Total Balance</h3>
+                        <p id="total-balance" class="text-xl font-bold">$0.00</p>
+                    </div>
+                    <div class="bg-light-card dark:bg-dark-card rounded-lg p-4 shadow">
+                        <h3 class="text-sm text-gray-500 dark:text-gray-400">Available</h3>
+                        <p id="available-balance" class="text-xl font-bold">$0.00</p>
+                    </div>
+                </div>
+                
+                <!-- Accounts Section -->
+                <div class="mb-6">
+                    <div class="flex justify-between items-center mb-2">
+                        <h2 class="text-lg font-bold">Accounts</h2>
+                        <button id="add-account-btn" class="text-primary text-sm">Add Account</button>
+                    </div>
+                    <div id="accounts-list" class="space-y-2">
+                        <div class="text-center text-gray-500 dark:text-gray-400 py-4">
+                            No accounts yet. Add your first account to get started.
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Envelopes by Category -->
+                <div>
+                    <div class="flex justify-between items-center mb-2">
+                        <h2 class="text-lg font-bold">Envelopes</h2>
+                        <button id="add-envelope-btn" class="text-primary text-sm">Add Envelope</button>
+                    </div>
+                    <div id="categories-list" class="space-y-4">
+                        <div class="text-center text-gray-500 dark:text-gray-400 py-4">
+                            No envelopes yet. Create a category and add envelopes to start budgeting.
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Transactions Page -->
+            <div id="transactions-page" class="page p-4">
+                <div class="flex justify-between items-center mb-4">
+                    <h2 class="text-lg font-bold">Transactions</h2>
+                    <button id="add-transaction-btn" class="text-primary text-sm">Add Transaction</button>
+                </div>
+                <div id="transactions-list" class="space-y-3">
+                    <div class="text-center text-gray-500 dark:text-gray-400 py-4">
+                        No transactions yet.
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Payees Page -->
+            <div id="payees-page" class="page p-4">
+                <div class="flex justify-between items-center mb-4">
+                    <h2 class="text-lg font-bold">Payees</h2>
+                    <button id="add-payee-btn" class="text-primary text-sm">Add Payee</button>
+                </div>
+                <div id="payees-list" class="space-y-3">
+                    <div class="text-center text-gray-500 dark:text-gray-400 py-4">
+                        No payees yet.
+                    </div>
+                </div>
+            </div>
+        </main>
+        
+        <!-- Bottom Navigation -->
+        <nav class="bg-light-card dark:bg-dark-card border-t border-gray-200 dark:border-gray-700 py-2">
+            <div class="flex justify-around">
+                <button class="nav-btn active py-1 px-4 rounded-md flex flex-col items-center" data-page="dashboard-page">
+                    <i class="fas fa-home text-lg"></i>
+                    <span class="text-xs mt-1">Dashboard</span>
+                </button>
+                <button class="nav-btn py-1 px-4 rounded-md flex flex-col items-center" data-page="transactions-page">
+                    <i class="fas fa-exchange-alt text-lg"></i>
+                    <span class="text-xs mt-1">Transactions</span>
+                </button>
+                <button class="nav-btn py-1 px-4 rounded-md flex flex-col items-center" data-page="payees-page">
+                    <i class="fas fa-users text-lg"></i>
+                    <span class="text-xs mt-1">Payees</span>
+                </button>
+            </div>
+        </nav>
+    </div>
+    
+    <!-- Modals Container -->
+    <div id="modal-container" class="fixed inset-0 bg-black bg-opacity-50 z-50 hidden items-center justify-center">
+        <!-- Modal content will be inserted here -->
+    </div>
+    
+    <script>
+        // Check for dark mode preference
+        if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
+            document.documentElement.classList.add('dark');
+        }
+        
+        // Listen for changes in color scheme preference
+        window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', event => {
+            if (event.matches) {
+                document.documentElement.classList.add('dark');
+            } else {
+                document.documentElement.classList.remove('dark');
+            }
+        });
+        
+        // App State
+        const appState = {
+            accounts: [],
+            categories: [],
+            envelopes: [],
+            transactions: [],
+            payees: [],
+            nextIds: {
+                account: 1,
+                category: 1,
+                envelope: 1,
+                transaction: 1,
+                payee: 1
+            },
+            fileSettings: {
+                fileHandle: null,
+                lastSync: null,
+                autoSave: true,
+                saveInterval: 5 * 60 * 1000, // 5 minutes in milliseconds
+                encryptionKey: '',
+                status: 'disconnected' // disconnected, connected, syncing, error
+            }
+        };
+        
+        // DOM Elements
+        const elements = {
+            pages: {
+                dashboard: document.getElementById('dashboard-page'),
+                transactions: document.getElementById('transactions-page'),
+                payees: document.getElementById('payees-page')
+            },
+            totalBalance: document.getElementById('total-balance'),
+            availableBalance: document.getElementById('available-balance'),
+            accountsList: document.getElementById('accounts-list'),
+            categoriesList: document.getElementById('categories-list'),
+            transactionsList: document.getElementById('transactions-list'),
+            payeesList: document.getElementById('payees-list'),
+            navButtons: document.querySelectorAll('.nav-btn'),
+            modalContainer: document.getElementById('modal-container'),
+            themeToggle: document.getElementById('theme-toggle'),
+            syncBtn: document.getElementById('sync-btn'),
+            syncStatus: document.getElementById('sync-status'),
+            settingsBtn: document.getElementById('settings-btn'),
+            addBtns: {
+                account: document.getElementById('add-account-btn'),
+                envelope: document.getElementById('add-envelope-btn'),
+                transaction: document.getElementById('add-transaction-btn'),
+                payee: document.getElementById('add-payee-btn')
+            }
+        };
+        
+        // Initialize with sample data
+        function initSampleData() {
+            // Add sample accounts
+            addAccount({ name: 'Checking', balance: 2500 });
+            addAccount({ name: 'Savings', balance: 5000 });
+            
+            // Add sample categories
+            const housingId = addCategory({ name: 'Housing' });
+            const utilitiesId = addCategory({ name: 'Utilities' });
+            const transportId = addCategory({ name: 'Transportation' });
+            
+            // Add sample envelopes
+            addEnvelope({ 
+                name: 'Rent', 
+                categoryId: housingId, 
+                budgetAmount: 1200, 
+                spent: 0, 
+                dueDate: '2023-07-01' 
+            });
+            addEnvelope({ 
+                name: 'Electricity', 
+                categoryId: utilitiesId, 
+                budgetAmount: 100, 
+                spent: 45, 
+                dueDate: '2023-07-15' 
+            });
+            addEnvelope({ 
+                name: 'Water', 
+                categoryId: utilitiesId, 
+                budgetAmount: 50, 
+                spent: 0, 
+                dueDate: '2023-07-20' 
+            });
+            addEnvelope({ 
+                name: 'Gas', 
+                categoryId: transportId, 
+                budgetAmount: 150, 
+                spent: 75, 
+                dueDate: '2023-07-10' 
+            });
+            
+            // Add sample payees
+            const landlordId = addPayee({ name: 'Landlord' });
+            const utilityCoId = addPayee({ name: 'Utility Company' });
+            const gasStationId = addPayee({ name: 'Gas Station' });
+            
+            // Add sample transactions
+            addTransaction({
+                date: '2023-06-15',
+                amount: 45,
+                description: 'Electric bill',
+                payeeId: utilityCoId,
+                envelopeId: appState.envelopes[1].id,
+                accountId: appState.accounts[0].id
+            });
+            addTransaction({
+                date: '2023-06-20',
+                amount: 75,
+                description: 'Gas fill-up',
+                payeeId: gasStationId,
+                envelopeId: appState.envelopes[3].id,
+                accountId: appState.accounts[0].id
+            });
+        }
+        
+        // CRUD Functions
+        function addAccount(account) {
+            const newAccount = {
+                id: appState.nextIds.account++,
+                name: account.name,
+                balance: account.balance
+            };
+            appState.accounts.push(newAccount);
+            renderAccounts();
+            updateBalances();
+            return newAccount.id;
+        }
+        
+        function addCategory(category) {
+            const newCategory = {
+                id: appState.nextIds.category++,
+                name: category.name
+            };
+            appState.categories.push(newCategory);
+            renderCategories();
+            return newCategory.id;
+        }
+        
+        function addEnvelope(envelope) {
+            const newEnvelope = {
+                id: appState.nextIds.envelope++,
+                name: envelope.name,
+                categoryId: envelope.categoryId,
+                budgetAmount: envelope.budgetAmount,
+                spent: envelope.spent || 0,
+                dueDate: envelope.dueDate
+            };
+            appState.envelopes.push(newEnvelope);
+            renderCategories();
+            updateBalances();
+            return newEnvelope.id;
+        }
+        
+        function addPayee(payee) {
+            const newPayee = {
+                id: appState.nextIds.payee++,
+                name: payee.name
+            };
+            appState.payees.push(newPayee);
+            renderPayees();
+            return newPayee.id;
+        }
+        
+        function addTransaction(transaction) {
+            const newTransaction = {
+                id: appState.nextIds.transaction++,
+                date: transaction.date,
+                amount: transaction.amount,
+                description: transaction.description,
+                payeeId: transaction.payeeId,
+                envelopeId: transaction.envelopeId,
+                accountId: transaction.accountId
+            };
+            
+            appState.transactions.push(newTransaction);
+            
+            // Update envelope spent amount
+            const envelope = appState.envelopes.find(e => e.id === transaction.envelopeId);
+            if (envelope) {
+                envelope.spent += transaction.amount;
+            }
+            
+            renderTransactions();
+            renderCategories();
+            updateBalances();
+            return newTransaction.id;
+        }
+        
+        // Render Functions
+        function renderAccounts() {
+            elements.accountsList.innerHTML = '';
+            
+            if (appState.accounts.length === 0) {
+                elements.accountsList.innerHTML = `
+                    <div class="text-center text-gray-500 dark:text-gray-400 py-4">
+                        No accounts yet. Add your first account to get started.
+                    </div>
+                `;
+                return;
+            }
+            
+            appState.accounts.forEach(account => {
+                const accountEl = document.createElement('div');
+                accountEl.className = 'bg-light-card dark:bg-dark-card rounded-lg p-3 shadow flex justify-between items-center';
+                accountEl.innerHTML = `
+                    <div class="flex items-center">
+                        <div class="w-8 h-8 bg-primary rounded-full flex items-center justify-center text-white mr-3">
+                            <i class="fas fa-university"></i>
+                        </div>
+                        <div>
+                            <h3 class="font-medium">${account.name}</h3>
+                        </div>
+                    </div>
+                    <div class="font-bold">$${account.balance.toFixed(2)}</div>
+                `;
+                
+                accountEl.addEventListener('click', () => {
+                    showEditAccountModal(account);
+                });
+                
+                elements.accountsList.appendChild(accountEl);
+            });
+        }
+        
+        function renderCategories() {
+            elements.categoriesList.innerHTML = '';
+            
+            if (appState.envelopes.length === 0) {
+                elements.categoriesList.innerHTML = `
+                    <div class="text-center text-gray-500 dark:text-gray-400 py-4">
+                        No envelopes yet. Create a category and add envelopes to start budgeting.
+                    </div>
+                `;
+                return;
+            }
+            
+            // Group envelopes by categories
+            const envelopesByCategory = {};
+            
+            appState.categories.forEach(category => {
+                envelopesByCategory[category.id] = {
+                    category,
+                    envelopes: []
+                };
+            });
+            
+            // Sort envelopes by due date
+            const sortedEnvelopes = [...appState.envelopes].sort((a, b) => {
+                return new Date(a.dueDate) - new Date(b.dueDate);
+            });
+            
+            sortedEnvelopes.forEach(envelope => {
+                if (envelopesByCategory[envelope.categoryId]) {
+                    envelopesByCategory[envelope.categoryId].envelopes.push(envelope);
+                }
+            });
+            
+            // Create DOM elements for each category and its envelopes
+            Object.values(envelopesByCategory).forEach(({ category, envelopes }) => {
+                if (envelopes.length === 0) return;
+                
+                const categoryEl = document.createElement('div');
+                categoryEl.className = 'mb-4';
+                
+                categoryEl.innerHTML = `
+                    <div class="flex justify-between items-center mb-2">
+                        <h3 class="font-bold text-gray-600 dark:text-gray-300">${category.name}</h3>
+                        <button class="text-primary text-sm add-to-category" data-category-id="${category.id}">
+                            <i class="fas fa-plus"></i>
+                        </button>
+                    </div>
+                    <div class="envelopes-list space-y-3"></div>
+                `;
+                
+                const envelopesList = categoryEl.querySelector('.envelopes-list');
+                
+                envelopes.forEach(envelope => {
+                    const percentSpent = envelope.budgetAmount > 0 ? 
+                        (envelope.spent / envelope.budgetAmount) * 100 : 0;
+                    
+                    const formattedDueDate = formatDate(envelope.dueDate);
+                    const daysDiff = getDaysDiff(envelope.dueDate);
+                    let dueDateClass = 'text-gray-500';
+                    
+                    if (daysDiff <= 3 && daysDiff >= 0) {
+                        dueDateClass = 'text-yellow-500';
+                    } else if (daysDiff < 0) {
+                        dueDateClass = 'text-red-500';
+                    }
+                    
+                    const envelopeEl = document.createElement('div');
+                    envelopeEl.className = 'bg-light-card dark:bg-dark-card rounded-lg p-3 shadow';
+                    envelopeEl.innerHTML = `
+                        <div class="flex justify-between items-center mb-2">
+                            <h4 class="font-medium">${envelope.name}</h4>
+                            <div class="${dueDateClass} text-sm">Due: ${formattedDueDate}</div>
+                        </div>
+                        <div class="mb-2">
+                            <div class="envelope-progress mb-1">
+                                <div style="width: ${Math.min(percentSpent, 100)}%; background-color: ${getProgressColor(percentSpent)}"></div>
+                            </div>
+                            <div class="flex justify-between text-xs text-gray-500 dark:text-gray-400">
+                                <div>$${envelope.spent.toFixed(2)} of $${envelope.budgetAmount.toFixed(2)}</div>
+                                <div>Remaining: $${(envelope.budgetAmount - envelope.spent).toFixed(2)}</div>
+                            </div>
+                        </div>
+                    `;
+                    
+                    envelopeEl.addEventListener('click', () => {
+                        showEditEnvelopeModal(envelope);
+                    });
+                    
+                    envelopesList.appendChild(envelopeEl);
+                });
+                
+                const addButton = categoryEl.querySelector('.add-to-category');
+                addButton.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    showAddEnvelopeModal(category.id);
+                });
+                
+                elements.categoriesList.appendChild(categoryEl);
+            });
+            
+            // Add a button to create a new category if needed
+            const addCategoryBtn = document.createElement('button');
+            addCategoryBtn.className = 'w-full py-2 text-primary text-center mt-4';
+            addCategoryBtn.innerHTML = '<i class="fas fa-folder-plus mr-2"></i>Add New Category';
+            addCategoryBtn.addEventListener('click', showAddCategoryModal);
+            
+            elements.categoriesList.appendChild(addCategoryBtn);
+        }
+        
+        function renderTransactions() {
+            elements.transactionsList.innerHTML = '';
+            
+            if (appState.transactions.length === 0) {
+                elements.transactionsList.innerHTML = `
+                    <div class="text-center text-gray-500 dark:text-gray-400 py-4">
+                        No transactions yet.
+                    </div>
+                `;
+                return;
+            }
+            
+            // Sort transactions by date (newest first)
+            const sortedTransactions = [...appState.transactions].sort((a, b) => {
+                return new Date(b.date) - new Date(a.date);
+            });
+            
+            // Group transactions by date
+            const transactionsByDate = {};
+            
+            sortedTransactions.forEach(transaction => {
+                const dateKey = transaction.date;
+                if (!transactionsByDate[dateKey]) {
+                    transactionsByDate[dateKey] = [];
+                }
+                transactionsByDate[dateKey].push(transaction);
+            });
+            
+            // Create DOM elements for each date group
+            Object.entries(transactionsByDate).forEach(([date, transactions]) => {
+                const groupEl = document.createElement('div');
+                groupEl.className = 'mb-4';
+                
+                groupEl.innerHTML = `
+                    <div class="text-sm font-medium text-gray-500 dark:text-gray-400 mb-2">${formatDate(date)}</div>
+                    <div class="transactions-group space-y-2"></div>
+                `;
+                
+                const transactionsGroup = groupEl.querySelector('.transactions-group');
+                
+                transactions.forEach(transaction => {
+                    const envelope = appState.envelopes.find(e => e.id === transaction.envelopeId);
+                    const payee = appState.payees.find(p => p.id === transaction.payeeId);
+                    const account = appState.accounts.find(a => a.id === transaction.accountId);
+                    
+                    const transactionEl = document.createElement('div');
+                    transactionEl.className = 'bg-light-card dark:bg-dark-card rounded-lg p-3 shadow flex justify-between';
+                    transactionEl.innerHTML = `
+                        <div>
+                            <div class="font-medium">${payee ? payee.name : 'Unknown Payee'}</div>
+                            <div class="text-sm text-gray-500 dark:text-gray-400">${transaction.description}</div>
+                            <div class="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                                ${envelope ? envelope.name : 'No Envelope'} · ${account ? account.name : 'No Account'}
+                            </div>
+                        </div>
+                        <div class="font-bold">$${transaction.amount.toFixed(2)}</div>
+                    `;
+                    
+                    transactionEl.addEventListener('click', () => {
+                        showEditTransactionModal(transaction);
+                    });
+                    
+                    transactionsGroup.appendChild(transactionEl);
+                });
+                
+                elements.transactionsList.appendChild(groupEl);
+            });
+        }
+        
+        function renderPayees() {
+            elements.payeesList.innerHTML = '';
+            
+            if (appState.payees.length === 0) {
+                elements.payeesList.innerHTML = `
+                    <div class="text-center text-gray-500 dark:text-gray-400 py-4">
+                        No payees yet.
+                    </div>
+                `;
+                return;
+            }
+            
+            // Sort payees alphabetically
+            const sortedPayees = [...appState.payees].sort((a, b) => {
+                return a.name.localeCompare(b.name);
+            });
+            
+            sortedPayees.forEach(payee => {
+                const payeeEl = document.createElement('div');
+                payeeEl.className = 'bg-light-card dark:bg-dark-card rounded-lg p-3 shadow flex justify-between items-center';
+                payeeEl.innerHTML = `
+                    <div class="flex items-center">
+                        <div class="w-8 h-8 bg-primary rounded-full flex items-center justify-center text-white mr-3">
+                            <i class="fas fa-user"></i>
+                        </div>
+                        <div>
+                            <h3 class="font-medium">${payee.name}</h3>
+                        </div>
+                    </div>
+                    <button class="text-primary edit-payee" data-payee-id="${payee.id}">
+                        <i class="fas fa-edit"></i>
+                    </button>
+                `;
+                
+                const editBtn = payeeEl.querySelector('.edit-payee');
+                editBtn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    showEditPayeeModal(payee);
+                });
+                
+                elements.payeesList.appendChild(payeeEl);
+            });
+        }
+        
+        // Update balance calculations
+        function updateBalances() {
+            // Calculate total balance from all accounts
+            const totalBalance = appState.accounts.reduce((sum, account) => sum + account.balance, 0);
+            elements.totalBalance.textContent = `$${totalBalance.toFixed(2)}`;
+            
+            // Calculate total budgeted amount
+            const totalBudgeted = appState.envelopes.reduce((sum, envelope) => sum + envelope.budgetAmount, 0);
+            
+            // Calculate available balance (not assigned to envelopes)
+            const availableBalance = totalBalance - totalBudgeted;
+            elements.availableBalance.textContent = `$${availableBalance.toFixed(2)}`;
+            
+            // Highlight negative available balance
+            if (availableBalance < 0) {
+                elements.availableBalance.classList.add('text-red-500');
+            } else {
+                elements.availableBalance.classList.remove('text-red-500');
+            }
+        }
+        
+        // Modal Functions
+        function showModal(title, content, width = 'max-w-md') {
+            elements.modalContainer.innerHTML = `
+                <div class="bg-light dark:bg-dark-card rounded-lg shadow-lg ${width} mx-4 overflow-hidden slide-in">
+                    <div class="flex justify-between items-center p-4 border-b border-gray-200 dark:border-gray-700">
+                        <h3 class="font-bold text-lg">${title}</h3>
+                        <button class="close-modal text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200">
+                            <i class="fas fa-times"></i>
+                        </button>
+                    </div>
+                    <div class="p-4">
+                        ${content}
+                    </div>
+                </div>
+            `;
+            
+            elements.modalContainer.classList.add('flex');
+            elements.modalContainer.classList.remove('hidden');
+            
+            const closeBtn = elements.modalContainer.querySelector('.close-modal');
+            closeBtn.addEventListener('click', hideModal);
+            
+            // Close modal when clicking outside
+            elements.modalContainer.addEventListener('click', (e) => {
+                if (e.target === elements.modalContainer) {
+                    hideModal();
+                }
+            });
+        }
+        
+        function hideModal() {
+            elements.modalContainer.classList.add('hidden');
+            elements.modalContainer.classList.remove('flex');
+        }
+        
+        // Modal Content Generators
+        function showAddAccountModal() {
+            const content = `
+                <form id="add-account-form" class="space-y-4">
+                    <div>
+                        <label class="block text-sm font-medium mb-1" for="account-name">Account Name</label>
+                        <input type="text" id="account-name" class="w-full p-2 rounded-md border border-gray-300 dark:border-gray-600 bg-light-input dark:bg-dark-input text-base" required>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium mb-1" for="account-balance">Initial Balance</label>
+                        <input type="number" id="account-balance" class="w-full p-2 rounded-md border border-gray-300 dark:border-gray-600 bg-light-input dark:bg-dark-input text-base" step="0.01" min="0" required>
+                    </div>
+                    <div class="pt-2">
+                        <button type="submit" class="w-full py-2 bg-primary text-white rounded-md hover:bg-secondary transition-colors">Add Account</button>
+                    </div>
+                </form>
+            `;
+            
+            showModal('Add Account', content);
+            
+            const form = document.getElementById('add-account-form');
+            form.addEventListener('submit', (e) => {
+                e.preventDefault();
+                const name = document.getElementById('account-name').value;
+                const balance = parseFloat(document.getElementById('account-balance').value);
+                
+                addAccount({ name, balance });
+                hideModal();
+            });
+        }
+        
+        function showEditAccountModal(account) {
+            const content = `
+                <form id="edit-account-form" class="space-y-4">
+                    <div>
+                        <label class="block text-sm font-medium mb-1" for="account-name">Account Name</label>
+                        <input type="text" id="account-name" class="w-full p-2 rounded-md border border-gray-300 dark:border-gray-600 bg-light-input dark:bg-dark-input text-base" value="${account.name}" required>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium mb-1" for="account-balance">Balance</label>
+                        <input type="number" id="account-balance" class="w-full p-2 rounded-md border border-gray-300 dark:border-gray-600 bg-light-input dark:bg-dark-input text-base" step="0.01" min="0" value="${account.balance}" required>
+                    </div>
+                    <div class="pt-2 flex space-x-2">
+                        <button type="submit" class="flex-1 py-2 bg-primary text-white rounded-md hover:bg-secondary transition-colors">Update</button>
+                        <button type="button" id="delete-account" class="py-2 px-4 bg-red-500 text-white rounded-md hover:bg-red-600 transition-colors">
+                            <i class="fas fa-trash"></i>
+                        </button>
+                    </div>
+                </form>
+            `;
+            
+            showModal('Edit Account', content);
+            
+            const form = document.getElementById('edit-account-form');
+            form.addEventListener('submit', (e) => {
+                e.preventDefault();
+                const name = document.getElementById('account-name').value;
+                const balance = parseFloat(document.getElementById('account-balance').value);
+                
+                // Update account
+                account.name = name;
+                account.balance = balance;
+                
+                renderAccounts();
+                updateBalances();
+                hideModal();
+            });
+            
+            const deleteBtn = document.getElementById('delete-account');
+            deleteBtn.addEventListener('click', () => {
+                // Check if account has transactions
+                const hasTransactions = appState.transactions.some(t => t.accountId === account.id);
+                
+                if (hasTransactions) {
+                    alert('Cannot delete account with transactions. Remove transactions first.');
+                    return;
+                }
+                
+                // Remove account
+                const index = appState.accounts.findIndex(a => a.id === account.id);
+                if (index !== -1) {
+                    appState.accounts.splice(index, 1);
+                    renderAccounts();
+                    updateBalances();
+                    hideModal();
+                }
+            });
+        }
+        
+        function showAddCategoryModal() {
+            const content = `
+                <form id="add-category-form" class="space-y-4">
+                    <div>
+                        <label class="block text-sm font-medium mb-1" for="category-name">Category Name</label>
+                        <input type="text" id="category-name" class="w-full p-2 rounded-md border border-gray-300 dark:border-gray-600 bg-light-input dark:bg-dark-input text-base" required>
+                    </div>
+                    <div class="pt-2">
+                        <button type="submit" class="w-full py-2 bg-primary text-white rounded-md hover:bg-secondary transition-colors">Add Category</button>
+                    </div>
+                </form>
+            `;
+            
+            showModal('Add Category', content);
+            
+            const form = document.getElementById('add-category-form');
+            form.addEventListener('submit', (e) => {
+                e.preventDefault();
+                const name = document.getElementById('category-name').value;
+                
+                addCategory({ name });
+                hideModal();
+            });
+        }
+        
+        function showAddEnvelopeModal(categoryId = null) {
+            let categoryOptions = '';
+            appState.categories.forEach(category => {
+                const selected = category.id === categoryId ? 'selected' : '';
+                categoryOptions += `<option value="${category.id}" ${selected}>${category.name}</option>`;
+            });
+            
+            // If no categories, show message to create one first
+            if (appState.categories.length === 0) {
+                const content = `
+                    <div class="text-center py-4">
+                        <p class="mb-4">You need to create a category first before adding an envelope.</p>
+                        <button id="create-category-btn" class="py-2 px-4 bg-primary text-white rounded-md hover:bg-secondary transition-colors">Create Category</button>
+                    </div>
+                `;
+                
+                showModal('No Categories', content);
+                
+                const createCategoryBtn = document.getElementById('create-category-btn');
+                createCategoryBtn.addEventListener('click', () => {
+                    hideModal();
+                    showAddCategoryModal();
+                });
+                
+                return;
+            }
+            
+            const today = new Date().toISOString().split('T')[0];
+            
+            const content = `
+                <form id="add-envelope-form" class="space-y-4">
+                    <div>
+                        <label class="block text-sm font-medium mb-1" for="envelope-name">Envelope Name</label>
+                        <input type="text" id="envelope-name" class="w-full p-2 rounded-md border border-gray-300 dark:border-gray-600 bg-light-input dark:bg-dark-input text-base" required>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium mb-1" for="envelope-category">Category</label>
+                        <select id="envelope-category" class="w-full p-2 rounded-md border border-gray-300 dark:border-gray-600 bg-light-input dark:bg-dark-input text-base" required>
+                            ${categoryOptions}
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium mb-1" for="envelope-amount">Budget Amount</label>
+                        <input type="number" id="envelope-amount" class="w-full p-2 rounded-md border border-gray-300 dark:border-gray-600 bg-light-input dark:bg-dark-input text-base" step="0.01" min="0" required>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium mb-1" for="envelope-due-date">Due Date</label>
+                        <input type="date" id="envelope-due-date" class="w-full p-2 rounded-md border border-gray-300 dark:border-gray-600 bg-light-input dark:bg-dark-input text-base" value="${today}" required>
+                    </div>
+                    <div class="pt-2">
+                        <button type="submit" class="w-full py-2 bg-primary text-white rounded-md hover:bg-secondary transition-colors">Add Envelope</button>
+                    </div>
+                </form>
+            `;
+            
+            showModal('Add Envelope', content);
+            
+            const form = document.getElementById('add-envelope-form');
+            form.addEventListener('submit', (e) => {
+                e.preventDefault();
+                const name = document.getElementById('envelope-name').value;
+                const categoryId = parseInt(document.getElementById('envelope-category').value);
+                const budgetAmount = parseFloat(document.getElementById('envelope-amount').value);
+                const dueDate = document.getElementById('envelope-due-date').value;
+                
+                addEnvelope({ name, categoryId, budgetAmount, spent: 0, dueDate });
+                hideModal();
+            });
+        }
+        
+        function showEditEnvelopeModal(envelope) {
+            let categoryOptions = '';
+            appState.categories.forEach(category => {
+                const selected = category.id === envelope.categoryId ? 'selected' : '';
+                categoryOptions += `<option value="${category.id}" ${selected}>${category.name}</option>`;
+            });
+            
+            const content = `
+                <form id="edit-envelope-form" class="space-y-4">
+                    <div>
+                        <label class="block text-sm font-medium mb-1" for="envelope-name">Envelope Name</label>
+                        <input type="text" id="envelope-name" class="w-full p-2 rounded-md border border-gray-300 dark:border-gray-600 bg-light-input dark:bg-dark-input text-base" value="${envelope.name}" required>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium mb-1" for="envelope-category">Category</label>
+                        <select id="envelope-category" class="w-full p-2 rounded-md border border-gray-300 dark:border-gray-600 bg-light-input dark:bg-dark-input text-base" required>
+                            ${categoryOptions}
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium mb-1" for="envelope-amount">Budget Amount</label>
+                        <input type="number" id="envelope amount" class="w-full p-2 rounded-md border border-gray-300 dark:border-gray-600 bg-light-input dark:bg-dark-input text-base" step="0.01" min="0" value="envelope.budgetAmount"required></div><div><labelclass="blocktext−smfont−mediummb−1"for="envelope−spent">SpentAmount</label><inputtype="number"id="envelope−spent"class="w−fullp−2rounded−mdborderborder−gray−300dark:border−gray−600bg−light−inputdark:bg−dark−inputtext−base"step="0.01"min="0"value="{envelope.spent}" required>
+</div>
+<div>
+<label class="block text-sm font-medium mb-1" for="envelope-due-date">Due Date</label>
+<input type="date" id="envelope-due-date" class="w-full p-2 rounded-md border border-gray-300 dark:border-gray-600 bg-light-input dark:bg-dark-input text-base" value="${envelope.dueDate}" required>
+</div>
+<div class="pt-2 flex space-x-2">
+<button type="submit" class="flex-1 py-2 bg-primary text-white rounded-md hover:bg-secondary transition-colors">Update</button>
+<button type="button" id="delete-envelope" class="py-2 px-4 bg-red-500 text-white rounded-md hover:bg-red-600 transition-colors">
+<i class="fas fa-trash"></i>
+</button>
+</div>
+</form>
+`;
+
+        showModal('Edit Envelope', content);
+        
+        const form = document.getElementById('edit-envelope-form');
+        form.addEventListener('submit', (e) => {
+            e.preventDefault();
+            const name = document.getElementById('envelope-name').value;
+            const categoryId = parseInt(document.getElementById('envelope-category').value);
+            const budgetAmount = parseFloat(document.getElementById('envelope-amount').value);
+            const spent = parseFloat(document.getElementById('envelope-spent').value);
+            const dueDate = document.getElementById('envelope-due-date').value;
+            
+            // Update envelope
+            envelope.name = name;
+            envelope.categoryId = categoryId;
+            envelope.budgetAmount = budgetAmount;
+            envelope.spent = spent;
+            envelope.dueDate = dueDate;
+            
+            renderCategories();
+            updateBalances();
+            hideModal();
+        });
+        
+        const deleteBtn = document.getElementById('delete-envelope');
+        deleteBtn.addEventListener('click', () => {
+            // Check if envelope has transactions
+            const hasTransactions = appState.transactions.some(t => t.envelopeId === envelope.id);
+            
+            if (hasTransactions) {
+                alert('Cannot delete envelope with transactions. Remove transactions first.');
+                return;
+            }
+            
+            // Remove envelope
+            const index = appState.envelopes.findIndex(e => e.id === envelope.id);
+            if (index !== -1) {
+                appState.envelopes.splice(index, 1);
+                renderCategories();
+                updateBalances();
+                hideModal();
+            }
+        });
+    }
+    
+    function showAddPayeeModal() {
+        const content = `
+            <form id="add-payee-form" class="space-y-4">
+                <div>
+                    <label class="block text-sm font-medium mb-1" for="payee-name">Payee Name</label>
+                    <input type="text" id="payee-name" class="w-full p-2 rounded-md border border-gray-300 dark:border-gray-600 bg-light-input dark:bg-dark-input text-base" required>
+                </div>
+                <div class="pt-2">
+                    <button type="submit" class="w-full py-2 bg-primary text-white rounded-md hover:bg-secondary transition-colors">Add Payee</button>
+                </div>
+            </form>
+        `;
+        
+        showModal('Add Payee', content);
+        
+        const form = document.getElementById('add-payee-form');
+        form.addEventListener('submit', (e) => {
+            e.preventDefault();
+            const name = document.getElementById('payee-name').value;
+            
+            addPayee({ name });
+            hideModal();
+        });
+    }
+    
+    function showEditPayeeModal(payee) {
+        const content = `
+            <form id="edit-payee-form" class="space-y-4">
+                <div>
+                    <label class="block text-sm font-medium mb-1" for="payee-name">Payee Name</label>
+                    <input type="text" id="payee-name" class="w-full p-2 rounded-md border border-gray-300 dark:border-gray-600 bg-light-input dark:bg-dark-input text-base" value="${payee.name}" required>
+                </div>
+                <div class="pt-2 flex space-x-2">
+                    <button type="submit" class="flex-1 py-2 bg-primary text-white rounded-md hover:bg-secondary transition-colors">Update</button>
+                    <button type="button" id="delete-payee" class="py-2 px-4 bg-red-500 text-white rounded-md hover:bg-red-600 transition-colors">
+                        <i class="fas fa-trash"></i>
+                    </button>
+                </div>
+            </form>
+        `;
+        
+        showModal('Edit Payee', content);
+        
+        const form = document.getElementById('edit-payee-form');
+        form.addEventListener('submit', (e) => {
+            e.preventDefault();
+            const name = document.getElementById('payee-name').value;
+            
+            // Update payee
+            payee.name = name;
+            
+            renderPayees();
+            renderTransactions(); // Update transaction display with new payee name
+            hideModal();
+        });
+        
+        const deleteBtn = document.getElementById('delete-payee');
+        deleteBtn.addEventListener('click', () => {
+            // Check if payee has transactions
+            const hasTransactions = appState.transactions.some(t => t.payeeId === payee.id);
+            
+            if (hasTransactions) {
+                alert('Cannot delete payee with transactions. Remove transactions first.');
+                return;
+            }
+            
+            // Remove payee
+            const index = appState.payees.findIndex(p => p.id === payee.id);
+            if (index !== -1) {
+                appState.payees.splice(index, 1);
+                renderPayees();
+                hideModal();
+            }
+        });
+    }
+    
+    function showAddTransactionModal() {
+        // If no accounts, envelopes, or payees, show message
+        if (appState.accounts.length === 0 || appState.envelopes.length === 0 || appState.payees.length === 0) {
+            let missingItems = [];
+            if (appState.accounts.length === 0) missingItems.push('accounts');
+            if (appState.envelopes.length === 0) missingItems.push('envelopes');
+            if (appState.payees.length === 0) missingItems.push('payees');
+            
+            const content = `
+                <div class="text-center py-4">
+                    <p class="mb-4">You need to create ${missingItems.join(' and ')} first before adding a transaction.</p>
+                </div>
+            `;
+            
+            showModal('Missing Information', content);
+            return;
+        }
+        
+        let accountOptions = '';
+        appState.accounts.forEach(account => {
+            accountOptions += `<option value="${account.id}">${account.name}</option>`;
+        });
+        
+        let envelopeOptions = '';
+        appState.envelopes.forEach(envelope => {
+            const category = appState.categories.find(c => c.id === envelope.categoryId);
+            envelopeOptions += `<option value="${envelope.id}">${envelope.name} (${category ? category.name : 'Unknown category'})</option>`;
+        });
+        
+        let payeeOptions = '';
+        appState.payees.forEach(payee => {
+            payeeOptions += `<option value="${payee.id}">${payee.name}</option>`;
+        });
+        
+        const today = new Date().toISOString().split('T')[0];
+        
+        const content = `
+            <form id="add-transaction-form" class="space-y-4">
+                <div>
+                    <label class="block text-sm font-medium mb-1" for="transaction-date">Date</label>
+                    <input type="date" id="transaction-date" class="w-full p-2 rounded-md border border-gray-300 dark:border-gray-600 bg-light-input dark:bg-dark-input text-base" value="${today}" required>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium mb-1" for="transaction-amount">Amount</label>
+                    <input type="number" id="transaction-amount" class="w-full p-2 rounded-md border border-gray-300 dark:border-gray-600 bg-light-input dark:bg-dark-input text-base" step="0.01" min="0" required>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium mb-1" for="transaction-description">Description</label>
+                    <input type="text" id="transaction-description" class="w-full p-2 rounded-md border border-gray-300 dark:border-gray-600 bg-light-input dark:bg-dark-input text-base" required>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium mb-1" for="transaction-payee">Payee</label>
+                    <select id="transaction-payee" class="w-full p-2 rounded-md border border-gray-300 dark:border-gray-600 bg-light-input dark:bg-dark-input text-base" required>
+                        ${payeeOptions}
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium mb-1" for="transaction-envelope">Envelope</label>
+                    <select id="transaction-envelope" class="w-full p-2 rounded-md border border-gray-300 dark:border-gray-600 bg-light-input dark:bg-dark-input text-base" required>
+                        ${envelopeOptions}
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium mb-1" for="transaction-account">Account</label>
+                    <select id="transaction-account" class="w-full p-2 rounded-md border border-gray-300 dark:border-gray-600 bg-light-input dark:bg-dark-input text-base" required>
+                        ${accountOptions}
+                    </select>
+                </div>
+                <div class="pt-2">
+                    <button type="submit" class="w-full py-2 bg-primary text-white rounded-md hover:bg-secondary transition-colors">Add Transaction</button>
+                </div>
+            </form>
+        `;
+        
+        showModal('Add Transaction', content);
+        
+        const form = document.getElementById('add-transaction-form');
+        form.addEventListener('submit', (e) => {
+            e.preventDefault();
+            const date = document.getElementById('transaction-date').value;
+            const amount = parseFloat(document.getElementById('transaction-amount').value);
+            const description = document.getElementById('transaction-description').value;
+            const payeeId = parseInt(document.getElementById('transaction-payee').value);
+            const envelopeId = parseInt(document.getElementById('transaction-envelope').value);
+            const accountId = parseInt(document.getElementById('transaction-account').value);
+            
+            addTransaction({ date, amount, description, payeeId, envelopeId, accountId });
+            hideModal();
+        });
+    }
+    
+    function showEditTransactionModal(transaction) {
+        let accountOptions = '';
+        appState.accounts.forEach(account => {
+            const selected = account.id === transaction.accountId ? 'selected' : '';
+            accountOptions += `<option value="${account.id}" ${selected}>${account.name}</option>`;
+        });
+        
+        let envelopeOptions = '';
+        appState.envelopes.forEach(envelope => {
+            const selected = envelope.id === transaction.envelopeId ? 'selected' : '';
+            const category = appState.categories.find(c => c.id === envelope.categoryId);
+            envelopeOptions += `<option value="${envelope.id}" ${selected}>${envelope.name} (${category ? category.name : 'Unknown category'})</option>`;
+        });
+        
+        let payeeOptions = '';
+        appState.payees.forEach(payee => {
+            const selected = payee.id === transaction.payeeId ? 'selected' : '';
+            payeeOptions += `<option value="${payee.id}" ${selected}>${payee.name}</option>`;
+        });
+        
+        const content = `
+            <form id="edit-transaction-form" class="space-y-4">
+                <div>
+                    <label class="block text-sm font-medium mb-1" for="transaction-date">Date</label>
+                    <input type="date" id="transaction-date" class="w-full p-2 rounded-md border border-gray-300 dark:border-gray-600 bg-light-input dark:bg-dark-input text-base" value="${transaction.date}" required>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium mb-1" for="transaction-amount">Amount</label>
+                    <input type="number" id="transaction-amount" class="w-full p-2 rounded-md border border-gray-300 dark:border-gray-600 bg-light-input dark:bg-dark-input text-base" step="0.01" min="0" value="${transaction.amount}" required>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium mb-1" for="transaction-description">Description</label>
+                    <input type="text" id="transaction-description" class="w-full p-2 rounded-md border border-gray-300 dark:border-gray-600 bg-light-input dark:bg-dark-input text-base" value="${transaction.description}" required>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium mb-1" for="transaction-payee">Payee</label>
+                    <select id="transaction-payee" class="w-full p-2 rounded-md border border-gray-300 dark:border-gray-600 bg-light-input dark:bg-dark-input text-base" required>
+                        ${payeeOptions}
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium mb-1" for="transaction-envelope">Envelope</label>
+                    <select id="transaction-envelope" class="w-full p-2 rounded-md border border-gray-300 dark:border-gray-600 bg-light-input dark:bg-dark-input text-base" required>
+                        ${envelopeOptions}
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium mb-1" for="transaction-account">Account</label>
+                    <select id="transaction-account" class="w-full p-2 rounded-md border border-gray-300 dark:border-gray-600 bg-light-input dark:bg-dark-input text-base" required>
+                        ${accountOptions}
+                    </select>
+                </div>
+                <div class="pt-2 flex space-x-2">
+                    <button type="submit" class="flex-1 py-2 bg-primary text-white rounded-md hover:bg-secondary transition-colors">Update</button>
+                    <button type="button" id="delete-transaction" class="py-2 px-4 bg-red-500 text-white rounded-md hover:bg-red-600 transition-colors">
+                        <i class="fas fa-trash"></i>
+                    </button>
+                </div>
+            </form>
+        `;
+        
+        showModal('Edit Transaction', content);
+        
+        const form = document.getElementById('edit-transaction-form');
+        form.addEventListener('submit', (e) => {
+            e.preventDefault();
+            const date = document.getElementById('transaction-date').value;
+            const newAmount = parseFloat(document.getElementById('transaction-amount').value);
+            const description = document.getElementById('transaction-description').value;
+            const payeeId = parseInt(document.getElementById('transaction-payee').value);
+            const newEnvelopeId = parseInt(document.getElementById('transaction-envelope').value);
+            const accountId = parseInt(document.getElementById('transaction-account').value);
+            
+            // Update spent amount on old envelope
+            if (transaction.envelopeId) {
+                const oldEnvelope = appState.envelopes.find(e => e.id === transaction.envelopeId);
+                if (oldEnvelope) {
+                    oldEnvelope.spent -= transaction.amount;
+                    if (oldEnvelope.spent < 0) oldEnvelope.spent = 0;
+                }
+            }
+            
+            // Update transaction
+            transaction.date = date;
+            transaction.amount = newAmount;
+            transaction.description = description;
+            transaction.payeeId = payeeId;
+            transaction.envelopeId = newEnvelopeId;
+            transaction.accountId = accountId;
+            
+            // Update spent amount on new envelope
+            if (newEnvelopeId) {
+                const newEnvelope = appState.envelopes.find(e => e.id === newEnvelopeId);
+                if (newEnvelope) {
+                    newEnvelope.spent += newAmount;
+                }
+            }
+            
+            renderTransactions();
+            renderCategories();
+            updateBalances();
+            hideModal();
+        });
+        
+        const deleteBtn = document.getElementById('delete-transaction');
+        deleteBtn.addEventListener('click', () => {
+            // Update envelope spent amount
+            if (transaction.envelopeId) {
+                const envelope = appState.envelopes.find(e => e.id === transaction.envelopeId);
+                if (envelope) {
+                    envelope.spent -= transaction.amount;
+                    if (envelope.spent < 0) envelope.spent = 0;
+                }
+            }
+            
+            // Remove transaction
+            const index = appState.transactions.findIndex(t => t.id === transaction.id);
+            if (index !== -1) {
+                appState.transactions.splice(index, 1);
+                renderTransactions();
+                renderCategories();
+                updateBalances();
+                hideModal();
+            }
+        });
+    }
+    
+    // Helper Functions
+    function formatDate(dateString) {
+        const options = { month: 'short', day: 'numeric' };
+        const date = new Date(dateString);
+        return date.toLocaleDateString('en-US', options);
+    }
+    
+    function getDaysDiff(dateString) {
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        
+        const targetDate = new Date(dateString);
+        targetDate.setHours(0, 0, 0, 0);
+        
+        const diffTime = targetDate - today;
+        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+        
+        return diffDays;
+    }
+    
+    function getProgressColor(percent) {
+        if (percent > 90) {
+            return '#EF4444'; // Red (danger)
+        } else if (percent > 75) {
+            return '#F59E0B'; // Amber (warning)
+        } else {
+            return '#10B981'; // Green (good)
+        }
+    }
+    
+    // Event Listeners
+    elements.navButtons.forEach(btn => {
+        btn.addEventListener('click', () => {
+            const targetPage = btn.getAttribute('data-page');
+            
+            // Hide all pages and remove active class from nav buttons
+            document.querySelectorAll('.page').forEach(page => {
+                page.classList.remove('active');
+            });
+            elements.navButtons.forEach(navBtn => {
+                navBtn.classList.remove('active');
+            });
+            
+            // Show target page and set active class to button
+            document.getElementById(targetPage).classList.add('active');
+            btn.classList.add('active');
+        });
+    });
+    
+    elements.themeToggle.addEventListener('click', () => {
+        document.documentElement.classList.toggle('dark');
+    });
+    
+    elements.settingsBtn.addEventListener('click', showSettingsModal);
+    elements.syncBtn.addEventListener('click', saveData);
+    
+    elements.addBtns.account.addEventListener('click', showAddAccountModal);
+    elements.addBtns.envelope.addEventListener('click', showAddEnvelopeModal);
+    elements.addBtns.transaction.addEventListener('click', showAddTransactionModal);
+    elements.addBtns.payee.addEventListener('click', showAddPayeeModal);
+    
+    // File System Access API Functions
+    async function openFile() {
+    const fileInput = document.createElement('input');
+    fileInput.type = 'file';
+    fileInput.accept = 'application/json';
+
+    fileInput.addEventListener('change', (event) => {
+        const file = event.target.files[0];
+        if (!file) return;
+
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            try {
+                const data = JSON.parse(e.target.result);
+                appState.accounts = data.accounts || [];
+                appState.categories = data.categories || [];
+                appState.envelopes = data.envelopes || [];
+                appState.transactions = data.transactions || [];
+                appState.payees = data.payees || [];
+                appState.nextIds = data.nextIds || {
+                    account: 1,
+                    category: 1,
+                    envelope: 1,
+                    transaction: 1,
+                    payee: 1
+                };
+
+                renderAccounts();
+                renderCategories();
+                renderTransactions();
+                renderPayees();
+                updateBalances();
+                showNotification("Budget file loaded successfully.");
+            } catch (error) {
+                alert("Failed to parse the file.");
+            }
+        };
+        reader.readAsText(file);
+    });
+
+    fileInput.click();
+});
+
+</script>
+</body> </html> ```
